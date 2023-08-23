@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from numerize.numerize import numerize
 
-random.seed(20)
-np.random.seed(20)
+# random.seed(20)
+# np.random.seed(20)
 
 # Constants for simulation settings
 SIMULATION_PERIOD = 300 # Total simulation months
@@ -21,6 +21,7 @@ agents_num_timeline = []
 agents_wealth = []  # Store agents' wealth over time
 agents_consumption_factor = []
 available_jobs = [entity.Farmer(), entity.Retailer(), entity.Driver()]  # Available job types
+jobs_incomes = []
 goods_data = []     # Store data about goods each month
 
 # Initialize agents at the start of the simulation
@@ -42,7 +43,13 @@ def handle_gdp():
 
 # Update goods prices based on demand and supply ratios
 def update_goods_prices():
-    goods_this_month = {}
+    goods_this_month = {
+        'food': 0,
+        'goods_c': 0,
+        'transport': 0,
+        'farmer': 0,
+        'retailer': 0,
+        'driver': 0}
     for key, goods in entity.all_goods.items():
         goods.update_price()
         entity.update_price_ratio(key, goods)
@@ -52,22 +59,16 @@ def update_goods_prices():
     return goods_this_month
 
 # Log to file
-def log_to_file(agent, goods_this_month):
+def log_agent_data(agent, goods_and_jobs):
     if isinstance(agent.job, entity.Farmer):
-        if 'farmer' not in goods_this_month.keys():
-            goods_this_month['farmer'] = 0
-        goods_this_month['farmer'] += 1   
+        goods_and_jobs['farmer'] += 1   
     elif isinstance(agent.job, entity.Retailer):
-        if 'retailer' not in goods_this_month.keys():
-            goods_this_month['retailer'] = 0
-        goods_this_month['retailer'] += 1
+        goods_and_jobs['retailer'] += 1
     elif isinstance(agent.job, entity.Driver):
-        if 'driver' not in goods_this_month.keys():
-            goods_this_month['driver'] = 0
-        goods_this_month['driver'] += 1
+        goods_and_jobs['driver'] += 1
     
 # Update agent activities, consumption, and record wealth
-def update_agents(goods_this_month):
+def update_agents(goods_and_jobs):
     global agents_len
     global agent_wealth
     global agents_consumption_factor
@@ -80,12 +81,12 @@ def update_agents(goods_this_month):
             print(f"{i+1}. {agent}")
         
         # Track the number of agents in each job type for this month
-        log_to_file(agent, goods_this_month)
+        log_agent_data(agent, goods_and_jobs)
         agent_cons_factor.append(agent.consumption_factor)
    
     agents_wealth.append(agent_wealth) 
     agents_consumption_factor.append(np.mean(agent_cons_factor))
-    goods_data.append(goods_this_month)
+    goods_data.append(goods_and_jobs)
     agents_num_timeline.append(len(agents))
 
 # Handle population growth by adding new agents
@@ -95,8 +96,24 @@ def handle_population_growth():
     needed_agent = round(agents_len-len(agents))
     if needed_agent >= 1:
         for x in range(needed_agent):
+            job = np.random.random()
+            if job < 0.6:
+                job = entity.Farmer()
+            elif job < 0.8:
+                job = entity.Retailer()
+            else:
+                job = entity.Driver()
             agent = entity.Agent(job=random.choice(available_jobs))
             agents.append(agent)
+
+def log_job_data():
+    incomes = [
+        entity.FARMER_OUTPUT_FOOD * entity.all_goods['food'].price,
+        entity.RETAILER_OUTPUT_GOODS * entity.all_goods['goods_c'].price,
+        entity.DRIVER_OUTPUT_TRANSPORT * entity.all_goods['transport'].price,
+    ]
+    jobs_incomes.append(incomes)
+
 
 # Main simulation loop
 def main():
@@ -110,15 +127,17 @@ def main():
         goods_this_month = update_goods_prices()
         update_agents(goods_this_month)
         handle_population_growth()
+        log_job_data()
         # time.sleep(1)
 
 if __name__ == "__main__":
     initialize_agents()
     main()
     data = pd.DataFrame(goods_data)
-    data['gdp'] = gdp_timeline
     data['agents'] = agents_num_timeline
+    data['gdp'] = gdp_timeline
     data['total_wealth'] = [sum(x) for x in agents_wealth]
     data['avg_cons_fac'] = agents_consumption_factor
+    data = pd.concat([data, pd.DataFrame(jobs_incomes, columns=['farmer', 'retailer', 'driver'])], axis=1)
     print(data)
     data.to_excel('goods.xlsx')

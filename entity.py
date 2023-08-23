@@ -1,6 +1,6 @@
 import numpy as np
 
-GOODS_MAX_PRICE_MULTIPLIER = 1.75
+GOODS_MAX_PRICE_MULTIPLIER = 2
 GOODS_MIN_PRICE_MULTIPLIER = 0.25
 
 FARMER_OUTPUT_FOOD = 150.0
@@ -8,7 +8,7 @@ RETAILER_OUTPUT_GOODS = 130.0
 DRIVER_OUTPUT_TRANSPORT = 1500.0
 
 AGENT_MIN_CONSUMPTION_FACTOR = 0.4
-AGENT_MAX_CONSUMPTION_FACTOR = 2.0
+AGENT_MAX_CONSUMPTION_FACTOR = 3.0
 
 AGENT_LOW_WEALTH_THRESHOLD = 500 # IN USD
 AGENT_HIGH_WEALTH_THRESHOLD = 2000 # IN USD
@@ -30,7 +30,7 @@ class Goods:
         if self.previous_supply != 0:
             multiplier = self.demand / self.previous_supply
         else:
-            multiplier = 100
+            multiplier = 1
         
         new_price = self.original_price * multiplier
         if new_price > self.max_price:
@@ -98,15 +98,19 @@ class Retailer(Job):
     def update_income(self):
         self.income = all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS
 
-
 class Driver(Job):
     def __init__(self) -> None:
         """A driver is assumed can drive 3000 km monthly"""
         super().__init__("Driver", 1.0, {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
 
     def update_income(self):
-        all_goods['goods_c'].price * DRIVER_OUTPUT_TRANSPORT
+        all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT
 
+job_mapping = {
+    'farmer': Farmer,
+    'retailer': Retailer,
+    'driver': Driver
+}
 
 """==========================================================================="""
 
@@ -126,7 +130,8 @@ class Agent:
         self.consume()
         self.update_consumption_factor()
         self.work()
-        self.consider_change_job()
+        if np.random.random() < 0.02:
+            self.consider_change_job()
            
     def consume(self):
         global global_gdp
@@ -153,15 +158,15 @@ class Agent:
         self._earn_income() 
             
     def consider_change_job(self):
-        if FARMER_OUTPUT_FOOD * all_goods['food'].price > self.job.income:
-            if np.random.random() < 0.01:
-                self.job = Farmer()
-        elif RETAILER_OUTPUT_GOODS * all_goods['goods_c'].price > self.job.income:
-            if np.random.random() < 0.01:
-                self.job = Retailer()
-        elif DRIVER_OUTPUT_TRANSPORT * all_goods['transport'].price > self.job.income:
-            if np.random.random() < 0.01:
-                self.job = Driver()
+        opportunity = {
+            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+            'self': self.job.income
+        }
+        opportunity = max(opportunity, key=opportunity.get)
+        if opportunity != 'self':
+            self.job = job_mapping[opportunity]()
 
     def _update_global_demand(self, goods_name: str, value: float):
         all_goods[goods_name].demand += value
