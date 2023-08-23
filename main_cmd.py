@@ -6,14 +6,15 @@ import pandas as pd
 from numerize.numerize import numerize
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 600 # Total simulation months
+SIMULATION_PERIOD = 300 # Total simulation months
 NUMBER_OF_AGENTS = 200  # Initial number of agents
 POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
 # Global variables
 gdp_timeline = []   # Store GDP over time
 agents = []         # List of agents in the economy
-agents_len = len(agents)
+agents_len = 0
+agents_num_timeline = []
 agents_wealth = []  # Store agents' wealth over time
 available_jobs = [entity.Farmer(), entity.Retailer(), entity.Driver()]  # Available job types
 goods_data = []     # Store data about goods each month
@@ -21,9 +22,12 @@ goods_data = []     # Store data about goods each month
 # Initialize agents at the start of the simulation
 def initialize_agents():
     global agents
+    global agents_len
     for x in range(NUMBER_OF_AGENTS):
         agent = entity.Agent(job=random.choice(available_jobs))
         agents.append(agent)
+
+    agents_len = len(agents)
 
 # Handle the calculation and logging of GDP
 def handle_gdp():
@@ -57,9 +61,10 @@ def log_to_file(agent, goods_this_month):
         if 'driver' not in goods_this_month.keys():
             goods_this_month['driver'] = 0
         goods_this_month['driver'] += 1
-    goods_data.append(goods_this_month)
+    
 # Update agent activities, consumption, and record wealth
 def update_agents(goods_this_month):
+    global agents_len
     agent_wealth = []
     for i, agent in enumerate(agents):
         agent.update()        
@@ -71,7 +76,8 @@ def update_agents(goods_this_month):
         log_to_file(agent, goods_this_month)
    
     agents_wealth.append(agent_wealth) 
-
+    goods_data.append(goods_this_month)
+    agents_num_timeline.append(len(agents))
 
 # Handle population growth by adding new agents
 def handle_population_growth():
@@ -102,4 +108,7 @@ if __name__ == "__main__":
     main()
     data = pd.DataFrame(goods_data)
     data['gdp'] = gdp_timeline
+    data['agents'] = agents_num_timeline
+    data['total_wealth'] = [sum(x) for x in agents_wealth]
+    print(data)
     data.to_excel('goods.xlsx')

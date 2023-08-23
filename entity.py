@@ -42,7 +42,7 @@ class Goods:
 all_goods = {
     'food': Goods('food', 1),
     'goods_c': Goods('goods_c', 2),
-    'transport': Goods('trnsprt', 0.5)
+    'transport': Goods('trnsprt', 0.025)
 }
 all_goods_price_ratio = {}
 
@@ -70,18 +70,18 @@ class Job:
 
 class Farmer(Job):
     def __init__(self) -> None:
-        """Farm measured in 1 ha. 1 ha produced 6000 kg of food per semester, which worked by 60 people.
+        """Farm measured in 1 ha. 1 ha produced 6000 kg of food per semester, which worked by 6 people.
         So, monthly it produces 17 kg per person"""
-        super().__init__("Farner", 150, 1.0, {'food': 17.0}, {'transport': 0.5})
+        super().__init__("Farner", all_goods['food'].price * 17.0, 1.0, {'food': 17.0}, {'transport': 0.5})
     
 class Retailer(Job):
     def __init__(self) -> None:
-        super().__init__("Retailer", 200, 1.0, {'goods_c': 50.0}, {}) # goods_c stands for goods for consumer
+        super().__init__("Retailer", all_goods['goods_c'].price * 50.0, 1.0, {'goods_c': 50.0}, {}) # goods_c stands for goods for consumer
 
 class Driver(Job):
     def __init__(self) -> None:
         """A driver is assumed can drive 3000 km monthly"""
-        super().__init__("Driver", 150, 1.0, {'transport': 3000.0}, {})
+        super().__init__("Driver", all_goods['transport'].price * 3000, 1.0, {'transport': 3000.0}, {})
 
 
 job_mapping = {
@@ -91,14 +91,16 @@ job_mapping = {
 
 """==========================================================================="""
 
+def randomize_consumption(consumption: dict):
+    consumption = {key: value for key, value in consumption.items()}
 
 class Agent:
     
     def __init__(self, initial_wealth=200.0, skill_level=1.0, consumption={'food': 7.0, 'goods_c': 30.0, 'transport': 240.0}, job=None) -> None:
         """All consumption measured monthly. food in kg, goods_c in unit, and transport in km"""
-        self.wealth: float = initial_wealth    # USD
-        self.skill_level: float = skill_level
-        self.consumption: dict = consumption
+        self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
+        self.skill_level: float = np.random.normal(skill_level, skill_level/20)
+        self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
         # self.consumption_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}  # TBD
         # self.production_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}   # TBD
         self.job: Job = job
