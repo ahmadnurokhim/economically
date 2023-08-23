@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 from numerize.numerize import numerize
 
+random.seed(20)
+np.random.seed(20)
+
 # Constants for simulation settings
 SIMULATION_PERIOD = 300 # Total simulation months
 NUMBER_OF_AGENTS = 1000  # Initial number of agents

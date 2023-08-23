@@ -107,10 +107,6 @@ class Driver(Job):
     def update_income(self):
         all_goods['goods_c'].price * DRIVER_OUTPUT_TRANSPORT
 
-job_mapping = {
-    'food': Farmer,
-    'goods_c': Retailer,
-    'transport': Driver}
 
 """==========================================================================="""
 
@@ -155,18 +151,17 @@ class Agent:
     def work(self):
         self._perform_job()
         self._earn_income() 
-
+            
     def consider_change_job(self):
-        for key, ratio in all_goods_price_ratio.items():
-            if ratio > 1:
-                if np.random.random() < (((ratio - 1) / 2) ** 2):
-                    self.job = job_mapping[key]()
-            else:
-                if np.random.random() < (((1 - ratio) / 2) ** 2):
-                    jobs = job_mapping.copy()
-                    jobs.pop(key)
-                    self.job = job_mapping[np.random.choice(list(jobs.keys()))]()
-                    
+        if FARMER_OUTPUT_FOOD * all_goods['food'].price > self.job.income:
+            if np.random.random() < 0.01:
+                self.job = Farmer()
+        elif RETAILER_OUTPUT_GOODS * all_goods['goods_c'].price > self.job.income:
+            if np.random.random() < 0.01:
+                self.job = Retailer()
+        elif DRIVER_OUTPUT_TRANSPORT * all_goods['transport'].price > self.job.income:
+            if np.random.random() < 0.01:
+                self.job = Driver()
 
     def _update_global_demand(self, goods_name: str, value: float):
         all_goods[goods_name].demand += value
