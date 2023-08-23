@@ -7,7 +7,7 @@ from numerize.numerize import numerize
 
 # Constants for simulation settings
 SIMULATION_PERIOD = 300 # Total simulation months
-NUMBER_OF_AGENTS = 200  # Initial number of agents
+NUMBER_OF_AGENTS = 1000  # Initial number of agents
 POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
 # Global variables
@@ -16,6 +16,7 @@ agents = []         # List of agents in the economy
 agents_len = 0
 agents_num_timeline = []
 agents_wealth = []  # Store agents' wealth over time
+agents_consumption_factor = []
 available_jobs = [entity.Farmer(), entity.Retailer(), entity.Driver()]  # Available job types
 goods_data = []     # Store data about goods each month
 
@@ -65,7 +66,10 @@ def log_to_file(agent, goods_this_month):
 # Update agent activities, consumption, and record wealth
 def update_agents(goods_this_month):
     global agents_len
+    global agent_wealth
+    global agents_consumption_factor
     agent_wealth = []
+    agent_cons_factor = []
     for i, agent in enumerate(agents):
         agent.update()        
         agent_wealth.append(agent.wealth)
@@ -74,8 +78,10 @@ def update_agents(goods_this_month):
         
         # Track the number of agents in each job type for this month
         log_to_file(agent, goods_this_month)
+        agent_cons_factor.append(agent.consumption_factor)
    
     agents_wealth.append(agent_wealth) 
+    agents_consumption_factor.append(np.mean(agent_cons_factor))
     goods_data.append(goods_this_month)
     agents_num_timeline.append(len(agents))
 
@@ -110,5 +116,6 @@ if __name__ == "__main__":
     data['gdp'] = gdp_timeline
     data['agents'] = agents_num_timeline
     data['total_wealth'] = [sum(x) for x in agents_wealth]
+    data['avg_cons_fac'] = agents_consumption_factor
     print(data)
     data.to_excel('goods.xlsx')

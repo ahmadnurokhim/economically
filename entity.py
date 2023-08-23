@@ -3,6 +3,16 @@ import numpy as np
 GOODS_MAX_PRICE_MULTIPLIER = 1.75
 GOODS_MIN_PRICE_MULTIPLIER = 0.25
 
+FARMER_OUTPUT_FOOD = 150.0
+RETAILER_OUTPUT_GOODS = 130.0
+DRIVER_OUTPUT_TRANSPORT = 1500.0
+
+AGENT_MIN_CONSUMPTION_FACTOR = 0.4
+AGENT_MAX_CONSUMPTION_FACTOR = 2.0
+
+AGENT_LOW_WEALTH_THRESHOLD = 500 # IN USD
+AGENT_HIGH_WEALTH_THRESHOLD = 2000 # IN USD
+
 global_gdp = 0
 
 class Goods:
@@ -42,7 +52,7 @@ class Goods:
 all_goods = {
     'food': Goods('food', 1),
     'goods_c': Goods('goods_c', 2),
-    'transport': Goods('trnsprt', 0.025)
+    'transport': Goods('trnsprt', 0.12)
 }
 all_goods_price_ratio = {}
 
@@ -53,12 +63,13 @@ def update_price_ratio(key, goods: Goods):
 
 
 class Job:
-    def __init__(self, title: str, income: float, required_skill: float, produced: dict, consumed: dict) -> None:
+    def __init__(self, title: str, required_skill: float, produced: dict, consumed: dict) -> None:
         self.title = title
-        self.income = income
+        self.income = 0
         self.required_skill = required_skill
         self.produced = produced
         self.consumed = consumed
+        self.update_income()
 
     def do_the_job(self):
         global global_gdp
@@ -68,21 +79,33 @@ class Job:
             all_goods[goods_name].demand += value
             global_gdp += all_goods[goods_name].price * value
 
+    def update_income(self):
+        pass
+
 class Farmer(Job):
     def __init__(self) -> None:
-        """Farm measured in 1 ha. 1 ha produced 6000 kg of food per semester, which worked by 6 people.
-        So, monthly it produces 17 kg per person"""
-        super().__init__("Farner", all_goods['food'].price * 17.0, 1.0, {'food': 17.0}, {'transport': 0.5})
+        """Farm measured in 1 ha. 1 ha produced 5400 kg of food per semester, which worked by 6 people.
+        So, monthly, it produces 150 kg per person"""
+        super().__init__("Farner", 1.0, {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
+    
+    def update_income(self):
+        self.income = all_goods['food'].price * FARMER_OUTPUT_FOOD
     
 class Retailer(Job):
     def __init__(self) -> None:
-        super().__init__("Retailer", all_goods['goods_c'].price * 50.0, 1.0, {'goods_c': 50.0}, {}) # goods_c stands for goods for consumer
+        super().__init__("Retailer", 1.0, {'goods_c': RETAILER_OUTPUT_GOODS}, {}) # goods_c stands for goods for consumer
+
+    def update_income(self):
+        self.income = all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS
+
 
 class Driver(Job):
     def __init__(self) -> None:
         """A driver is assumed can drive 3000 km monthly"""
-        super().__init__("Driver", all_goods['transport'].price * 3000, 1.0, {'transport': 3000.0}, {})
+        super().__init__("Driver", 1.0, {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
 
+    def update_income(self):
+        all_goods['goods_c'].price * DRIVER_OUTPUT_TRANSPORT
 
 job_mapping = {
     'food': Farmer,
@@ -91,8 +114,6 @@ job_mapping = {
 
 """==========================================================================="""
 
-def randomize_consumption(consumption: dict):
-    consumption = {key: value for key, value in consumption.items()}
 
 class Agent:
     
@@ -101,23 +122,36 @@ class Agent:
         self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
         self.skill_level: float = np.random.normal(skill_level, skill_level/20)
         self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
-        # self.consumption_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}  # TBD
+        self.consumption_factor = 1.0
         # self.production_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}   # TBD
         self.job: Job = job
     
     def update(self):
         self.consume()
+        self.update_consumption_factor()
         self.work()
         self.consider_change_job()
            
     def consume(self):
         global global_gdp
         for goods_name, value in self.consumption.items():
-            self._update_global_demand(goods_name, value)
+            actual_consumption = value * self.consumption_factor
+            self._update_global_demand(goods_name, actual_consumption)
             money = all_goods[goods_name].price * value
             self._update_wealth(money)
             global_gdp += money
         
+    def update_consumption_factor(self):
+        if self.wealth < AGENT_LOW_WEALTH_THRESHOLD:
+            self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
+        elif self.wealth >= AGENT_LOW_WEALTH_THRESHOLD and self.wealth < AGENT_HIGH_WEALTH_THRESHOLD:
+            if self.consumption_factor < 1.0:
+                self.consumption_factor = min(self.consumption_factor + 0.05, 1)
+            elif self.consumption_factor > 1.0:
+                self.consumption_factor = max(self.consumption_factor - 0.05, 1)
+        elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD:
+            self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
+
     def work(self):
         self._perform_job()
         self._earn_income() 
@@ -125,10 +159,10 @@ class Agent:
     def consider_change_job(self):
         for key, ratio in all_goods_price_ratio.items():
             if ratio > 1:
-                if np.random.random() < (((ratio - 1) / 2) ** 4):
+                if np.random.random() < (((ratio - 1) / 2) ** 2):
                     self.job = job_mapping[key]()
             else:
-                if np.random.random() < (((1 - ratio) / 2) ** 4):
+                if np.random.random() < (((1 - ratio) / 2) ** 2):
                     jobs = job_mapping.copy()
                     jobs.pop(key)
                     self.job = job_mapping[np.random.choice(list(jobs.keys()))]()
