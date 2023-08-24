@@ -160,7 +160,7 @@ class Agent:
         global AGENT_ID
         self.id = AGENT_ID
         self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
-        self.latest_outcome = 0
+        self.latest_spending = 0
         # self.skill_level: float = np.random.normal(skill_level, skill_level/5)
         self.skill_level = skill_level
         self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
@@ -186,19 +186,26 @@ class Agent:
             self._update_wealth(money_spent_on_this_goods)
             money_spent += money_spent_on_this_goods
             global_gdp += money_spent_on_this_goods
-        self.latest_outcome = money_spent
+        self.latest_spending = money_spent
         
     def update_consumption_factor(self):
         # Based on wealth
-        if self.wealth < AGENT_LOW_WEALTH_THRESHOLD:
-            self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
-        elif self.wealth >= AGENT_LOW_WEALTH_THRESHOLD and self.wealth < AGENT_HIGH_WEALTH_THRESHOLD:
-            if self.consumption_factor < 1.0:
-                self.consumption_factor = min(self.consumption_factor + 0.05, 1)
-            elif self.consumption_factor > 1.0:
-                self.consumption_factor = max(self.consumption_factor - 0.05, 1)
-        elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD and np.random.random() < 0.1:
+        # if self.wealth < AGENT_LOW_WEALTH_THRESHOLD:
+        #     self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
+        # elif self.wealth >= AGENT_LOW_WEALTH_THRESHOLD and self.wealth < AGENT_HIGH_WEALTH_THRESHOLD:
+        #     if self.consumption_factor < 1.0:
+        #         self.consumption_factor = min(self.consumption_factor + 0.05, 1)
+        #     elif self.consumption_factor > 1.0:
+        #         self.consumption_factor = max(self.consumption_factor - 0.05, 1)
+        # elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD and np.random.random() < 0.1:
+        #     self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
+        self_profit = self.job.income - self.latest_spending
+        if self_profit > 100:
             self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
+        elif self_profit < 0:
+            self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
+        else:
+            self.consumption_factor += np.random.choice([0.05, -0.05])
 
     def work(self):
         self._perform_job()
