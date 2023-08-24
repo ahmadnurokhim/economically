@@ -5,12 +5,12 @@ import numpy as np
 import pandas as pd
 from numerize.numerize import numerize
 
-# random.seed(20)
-# np.random.seed(20)
+random.seed(20)
+np.random.seed(20)
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 300 # Total simulation months
-NUMBER_OF_AGENTS = 1000  # Initial number of agents
+SIMULATION_PERIOD = 600 # Total simulation months
+NUMBER_OF_AGENTS = 3000  # Initial number of agents
 POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
 # Global variables
@@ -30,7 +30,20 @@ def initialize_agents():
     global agents_len
     for x in range(NUMBER_OF_AGENTS):
         # agent = entity.Agent(job=random.choice(available_jobs))
-        agent = entity.Agent(skill_level=np.random.choice([1.0, 3.0]), job=random.choice(available_jobs))
+        skill_level = 1.0
+        if np.random.random() < 0.01:
+            skill_level = 3.0
+        elif np.random.random() < 0.1:
+            skill_level = 2.0
+        
+        target_job = 0
+        if np.random.random() < 0.07:
+            target_job = available_jobs[0]
+        elif np.random.random() < 0.6:
+            target_job = available_jobs[1]
+        else:
+            target_job = available_jobs[2]
+        agent = entity.Agent(skill_level=skill_level, job=target_job)
         agents.append(agent)
         print(agent.id)
 
@@ -40,7 +53,6 @@ def initialize_agents():
 def handle_gdp():
     global gdp_timeline
     gdp_timeline.append(entity.global_gdp)
-    print(f"${numerize(entity.global_gdp)}")
     entity.global_gdp = 0
 
 # Update goods prices based on demand and supply ratios
@@ -49,15 +61,16 @@ def update_goods_prices():
         'food': 0,
         'goods_c': 0,
         'transport': 0,
+        'energy': 0,
         'farmer': 0,
         'retailer': 0,
-        'driver': 0}
+        'driver': 0,
+        'academics': 0}
         
     for key, goods in entity.all_goods.items():
         goods.update_price()
         entity.update_price_ratio(key, goods)
         goods_this_month[key] = goods.price/goods.original_price
-        print(goods)
         goods.reset_value()
     return goods_this_month
 
@@ -69,6 +82,8 @@ def log_agent_data(agent, goods_and_jobs):
         goods_and_jobs['retailer'] += 1
     elif isinstance(agent.job, entity.Driver):
         goods_and_jobs['driver'] += 1
+    elif isinstance(agent.job, entity.Academics):
+        goods_and_jobs['academics'] += 1
     
 # Update agent activities, consumption, and record wealth
 def update_agents(goods_and_jobs):
@@ -80,8 +95,6 @@ def update_agents(goods_and_jobs):
     for i, agent in enumerate(agents):
         agent.update()        
         agent_wealth.append(agent.wealth)
-        if i < 3:
-            print(f"{i+1}. {agent}")
         
         # Track the number of agents in each job type for this month
         log_agent_data(agent, goods_and_jobs)
@@ -125,13 +138,14 @@ def main():
 
     # Iterate through the simulation period
     for _ in range(SIMULATION_PERIOD):
-        print("===================================")
         handle_gdp()        
         goods_this_month = update_goods_prices()
-        update_agents(goods_this_month)
+        update_agents(goods_this_month) # this variable is passed just for logging
         handle_population_growth()
         log_job_data()
-        # time.sleep(1)
+        if _ % 10 == 0:
+            print(f"Month: {_}")
+        # time.sleep(0.1)
 
 if __name__ == "__main__":
     initialize_agents()
@@ -142,6 +156,7 @@ if __name__ == "__main__":
     data['total_wealth'] = [sum(x) for x in agents_wealth]
     data['avg_cons_fac'] = agents_consumption_factor
     data = pd.concat([data, pd.DataFrame(jobs_incomes, columns=['farmer', 'retailer', 'driver'])], axis=1)
+    data['wealth_per_capita'] = data['total_wealth']/data['agents']
     # print(data)
     # print([{x.id: x.wealth} for x in agents])
     data.to_excel('goods.xlsx')

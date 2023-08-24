@@ -3,16 +3,31 @@ import numpy as np
 GOODS_MAX_PRICE_MULTIPLIER = 2
 GOODS_MIN_PRICE_MULTIPLIER = 0.25
 
-FARMER_OUTPUT_FOOD = 150.0
-RETAILER_OUTPUT_GOODS = 130.0
-DRIVER_OUTPUT_TRANSPORT = 1500.0
+ENERGY_PRICE = 0.1  # USD/KWh
+UTILITY = 1         # Based    
+STABLE_GOODS = ['energy']                      
+
+INCOME_ACADEMICS = 550
+INCOME_STUDENT = -50
+INCOME_CLERK = 350
+INCOME_WORKER = 280
+
+FARMER_OUTPUT_FOOD = 160.0          # 150
+RETAILER_OUTPUT_GOODS = 120.0       # 130
+DRIVER_OUTPUT_TRANSPORT = 1500.0    # 1500
 ACADEMICS_FIXED_INCOME = 400
 
+AGENT_DEFAULT_CONSUMPTION = {
+    'food': 7.0,
+    'goods_c': 30.0,
+    'transport': 240.0,
+    'energy': 10}
+
 AGENT_MIN_CONSUMPTION_FACTOR = 0.4
-AGENT_MAX_CONSUMPTION_FACTOR = 3.0
+AGENT_MAX_CONSUMPTION_FACTOR = 4.0
 
 AGENT_LOW_WEALTH_THRESHOLD = 500 # IN USD
-AGENT_HIGH_WEALTH_THRESHOLD = 2000 # IN USD
+AGENT_HIGH_WEALTH_THRESHOLD = 5000 # IN USD
 AGENT_ID = 0
 
 global_gdp = 0
@@ -29,6 +44,9 @@ class Goods:
         self.min_price = price * GOODS_MIN_PRICE_MULTIPLIER
 
     def update_price(self):
+        if self.name in STABLE_GOODS:
+            return
+        
         if self.previous_supply != 0:
             multiplier = self.demand / self.previous_supply
         else:
@@ -54,7 +72,8 @@ class Goods:
 all_goods = {
     'food': Goods('food', 1),
     'goods_c': Goods('goods_c', 2),
-    'transport': Goods('trnsprt', 0.12)
+    'transport': Goods('transport', 0.12),
+    'energy': Goods('energy', ENERGY_PRICE)
 }
 all_goods_price_ratio = {}
 
@@ -82,7 +101,7 @@ class Job:
             global_gdp += all_goods[goods_name].price * value
 
     def update_income(self):
-        pass
+        return
 
 class Farmer(Job):
     def __init__(self) -> None:
@@ -109,26 +128,26 @@ class Driver(Job):
 
 class Academics(Job):
     def __init__(self):
-        super().__init__("Academics", required_skill=3.0, produced={}, consumed={})
-        self.update_income()
-    
-    def update_income(self):
-        self.income = 400.0
+        super().__init__("Academics", 3.0, produced={}, consumed={})
+        self.income = INCOME_ACADEMICS
 
 class Student(Job):
     def __init__(self):
-        super().__init__("Student", required_skill=1.0, produced={}, consumed={})
-        self.update_income()
-    
-    def update_income(self):
-        self.income = -50.0
+        super().__init__("Student", 1.0, produced={}, consumed={})
+        self.income = INCOME_STUDENT
+
+class Clerk(Job):
+    def __init__(self) -> None:
+        super().__init__("Clerk", 2.0, produced={}, consumed={})
+        self.income = INCOME_CLERK
 
 job_mapping = {
     'farmer': Farmer,
     'retailer': Retailer,
     'driver': Driver,
     'academics': Academics,
-    'student': Student
+    'student': Student,
+    'clerk': Clerk
 }
 
 
@@ -136,17 +155,16 @@ job_mapping = {
 
 
 class Agent:
-    
-    def __init__(self, initial_wealth=200.0, skill_level=1.0, consumption={'food': 7.0, 'goods_c': 30.0, 'transport': 240.0}, job=None) -> None:
+    def __init__(self, initial_wealth=200.0, skill_level=1.0, consumption=AGENT_DEFAULT_CONSUMPTION, job=None) -> None:
         """All consumption measured monthly. food in kg, goods_c in unit, and transport in km"""
         global AGENT_ID
         self.id = AGENT_ID
         self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
+        self.latest_outcome = 0
         # self.skill_level: float = np.random.normal(skill_level, skill_level/5)
         self.skill_level = skill_level
         self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
         self.consumption_factor = 1.0
-        # self.production_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}   # TBD
         self.job: Job = job
         
         AGENT_ID = AGENT_ID + 1
@@ -160,14 +178,18 @@ class Agent:
            
     def consume(self):
         global global_gdp
+        money_spent = 0
         for goods_name, value in self.consumption.items():
-            actual_consumption = value * self.consumption_factor
+            actual_consumption = value * self.consumption_factor # actual consumption for current goods  
             self._update_global_demand(goods_name, actual_consumption)
-            money = all_goods[goods_name].price * value
-            self._update_wealth(money)
-            global_gdp += money
+            money_spent_on_this_goods = all_goods[goods_name].price * actual_consumption
+            self._update_wealth(money_spent_on_this_goods)
+            money_spent += money_spent_on_this_goods
+            global_gdp += money_spent_on_this_goods
+        self.latest_outcome = money_spent
         
     def update_consumption_factor(self):
+        # Based on wealth
         if self.wealth < AGENT_LOW_WEALTH_THRESHOLD:
             self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
         elif self.wealth >= AGENT_LOW_WEALTH_THRESHOLD and self.wealth < AGENT_HIGH_WEALTH_THRESHOLD:
@@ -175,7 +197,7 @@ class Agent:
                 self.consumption_factor = min(self.consumption_factor + 0.05, 1)
             elif self.consumption_factor > 1.0:
                 self.consumption_factor = max(self.consumption_factor - 0.05, 1)
-        elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD:
+        elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD and np.random.random() < 0.1:
             self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
 
     def work(self):
@@ -192,24 +214,28 @@ class Agent:
             'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
             'self': self.job.income
         }
-        if self.skill_level >= 3:
-            opportunity.update({'academics': ACADEMICS_FIXED_INCOME})
-
-        opportunity = max(opportunity, key=opportunity.get) # will output a job name/id
+        if self.skill_level >= 3.0:
+            level_3_jobs = {'academics': ACADEMICS_FIXED_INCOME}
+            opportunity.update(level_3_jobs)
+            best_opportunity = max(opportunity, key=opportunity.get) # will output a job name/id
         
-        if opportunity == 'academics':
-            available_org_ids = []
-            for org_id, org in global_orgs.items():
-                if org.get_vacancy()[opportunity] > 0:
-                    available_org_ids.append(org_id)
-            if len(available_org_ids) > 0:
-                choosen_org_id = np.random.choice(available_org_ids)
-                self.job = global_orgs[choosen_org_id].apply(self.id, opportunity)
-                return
-            else:
-                opportunity = 'self'
-        if opportunity != 'self':
-            self.job = job_mapping[opportunity]()
+            if best_opportunity in level_3_jobs.keys():
+                # Checking the available jobs
+                available_org_ids = []
+                for org_id, org in global_orgs.items():
+                    vacancy_for_current_org = org.get_vacancy()
+                    if best_opportunity in vacancy_for_current_org.keys():
+                        if vacancy_for_current_org[best_opportunity] > 0:
+                            available_org_ids.append(org_id)
+
+                if len(available_org_ids) > 0:
+                    chosen_org_id = np.random.choice(available_org_ids)
+                    self.job = global_orgs[chosen_org_id].apply(self.id, best_opportunity)
+                    return
+            opportunity.pop('academics')
+        best_opportunity = max(opportunity, key=opportunity.get)
+        if best_opportunity != 'self':
+            self.job = job_mapping[best_opportunity]()
 
     def _update_global_demand(self, goods_name: str, value: float):
         all_goods[goods_name].demand += value
@@ -233,15 +259,15 @@ class Agent:
 class Organization:
     def __init__(self, name: str, employees_needed: dict):
         self.name: str = name
+        self.cash = 0
         self.employees_needed: dict = employees_needed
-        self.employee_ids = {}
+        self.employee_ids = {key: [] for key in self.employees_needed.keys()}
         self.need_employees = True
 
     def get_vacancy(self):
         # Calculate the difference between needed employees and the number of employees for each job
-        vacancy = {key: self.employees_needed[key] - len(self.employee_ids.get(key, [])) for key in self.employees_needed.keys()}
-        print(self.employee_ids)
-        return vacancy
+        vacancy = {key: self.employees_needed[key] - len(self.employee_ids[key]) for key in self.employees_needed.keys()}
+        return vacancy # return a dict with job (key) and vacancy (value)
 
     def apply(self, employee_id: int, job: str):
         """This method will be called from agent's consider_change_job. In return, the agent will receive the job instace"""
@@ -253,10 +279,78 @@ class Organization:
     def resign(self, employee_id: int, job: str):
         """This method will be called from agent's consider_change_job"""
         self.employee_ids[job].remove(employee_id)
+    
+    def update_cash(self):
+        pass
         
 class School(Organization):
     def __init__(self):
         super().__init__("School", employees_needed={"academics":2, "student": 40})
-        self.employees_ids = {key: [] for key in self.employees_needed.keys()}
     
-global_orgs = {'school_1': School()}
+class Government(Organization):
+    def __init__(self):
+        super().__init__('Government', employees_needed={'clerk': 20})
+
+global_orgs = {'school_1': School(), 'government': Government()}
+
+# farm*
+# produce: food
+# consume: -
+# employee: farmer
+
+# retail*
+# produce: goods_c
+# consume: -
+# employee: retailer
+
+# tranport*
+# produce: transport
+# consume: -
+# employee: driver
+
+# school*
+# produce: -
+# consume: energy
+# employee: 2 academics, 40 students
+
+# government
+# produce: -
+# consume: energy
+# employee: 20 clerks
+
+# manufacturing
+# produce: goods_r
+# consume: energy
+# employee: 4 clerks, 20 worker
+
+# mining
+# produce: coal
+# consume: energy
+# employee: 4 clerk, 20 worker
+
+# power plant
+# produce: energy
+# consume: coal
+# employee: 4 clerks, 10 worker, 2 specialist
+
+# monthly incomes in USD/month based on indonesian income
+# farmer    : food price * food output (avg 160)
+# retailer  : goods_c price * goods_c output (avg 240)
+# driver    : transport price * transport output (avg 180)
+# academics : 550
+# student   : -50
+# clerks    : 350
+# worker    : 280
+# specialist: 
+
+# skil level (1 = uneducated, 2 = educated, 3 = highly educated)
+# farmer    : 1
+# retailer  : 1
+# driver    : 1
+# academics : 3
+# student   : 1
+# clerks    : 2
+# worker    : 1
+# specialist: 3
+
+# *done
