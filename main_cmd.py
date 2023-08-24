@@ -29,8 +29,10 @@ def initialize_agents():
     global agents
     global agents_len
     for x in range(NUMBER_OF_AGENTS):
-        agent = entity.Agent(job=random.choice(available_jobs))
+        # agent = entity.Agent(job=random.choice(available_jobs))
+        agent = entity.Agent(skill_level=np.random.choice([1.0, 3.0]), job=random.choice(available_jobs))
         agents.append(agent)
+        print(agent.id)
 
     agents_len = len(agents)
 
@@ -50,6 +52,7 @@ def update_goods_prices():
         'farmer': 0,
         'retailer': 0,
         'driver': 0}
+        
     for key, goods in entity.all_goods.items():
         goods.update_price()
         entity.update_price_ratio(key, goods)
@@ -139,5 +142,6 @@ if __name__ == "__main__":
     data['total_wealth'] = [sum(x) for x in agents_wealth]
     data['avg_cons_fac'] = agents_consumption_factor
     data = pd.concat([data, pd.DataFrame(jobs_incomes, columns=['farmer', 'retailer', 'driver'])], axis=1)
-    print(data)
+    # print(data)
+    # print([{x.id: x.wealth} for x in agents])
     data.to_excel('goods.xlsx')

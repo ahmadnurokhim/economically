@@ -6,12 +6,14 @@ GOODS_MIN_PRICE_MULTIPLIER = 0.25
 FARMER_OUTPUT_FOOD = 150.0
 RETAILER_OUTPUT_GOODS = 130.0
 DRIVER_OUTPUT_TRANSPORT = 1500.0
+ACADEMICS_FIXED_INCOME = 400
 
 AGENT_MIN_CONSUMPTION_FACTOR = 0.4
 AGENT_MAX_CONSUMPTION_FACTOR = 3.0
 
 AGENT_LOW_WEALTH_THRESHOLD = 500 # IN USD
 AGENT_HIGH_WEALTH_THRESHOLD = 2000 # IN USD
+AGENT_ID = 0
 
 global_gdp = 0
 
@@ -100,17 +102,35 @@ class Retailer(Job):
 
 class Driver(Job):
     def __init__(self) -> None:
-        """A driver is assumed can drive 3000 km monthly"""
         super().__init__("Driver", 1.0, {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
 
     def update_income(self):
-        all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT
+        self.income = all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT
+
+class Academics(Job):
+    def __init__(self):
+        super().__init__("Academics", required_skill=3.0, produced={}, consumed={})
+        self.update_income()
+    
+    def update_income(self):
+        self.income = 400.0
+
+class Student(Job):
+    def __init__(self):
+        super().__init__("Student", required_skill=1.0, produced={}, consumed={})
+        self.update_income()
+    
+    def update_income(self):
+        self.income = -50.0
 
 job_mapping = {
     'farmer': Farmer,
     'retailer': Retailer,
-    'driver': Driver
+    'driver': Driver,
+    'academics': Academics,
+    'student': Student
 }
+
 
 """==========================================================================="""
 
@@ -119,18 +139,23 @@ class Agent:
     
     def __init__(self, initial_wealth=200.0, skill_level=1.0, consumption={'food': 7.0, 'goods_c': 30.0, 'transport': 240.0}, job=None) -> None:
         """All consumption measured monthly. food in kg, goods_c in unit, and transport in km"""
+        global AGENT_ID
+        self.id = AGENT_ID
         self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
-        self.skill_level: float = np.random.normal(skill_level, skill_level/20)
+        # self.skill_level: float = np.random.normal(skill_level, skill_level/5)
+        self.skill_level = skill_level
         self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
         self.consumption_factor = 1.0
         # self.production_factor = {'current': 1.0, 'min': 0.4, 'max': 2.0}   # TBD
         self.job: Job = job
+        
+        AGENT_ID = AGENT_ID + 1
     
     def update(self):
         self.consume()
         self.update_consumption_factor()
         self.work()
-        if np.random.random() < 0.02:
+        if np.random.random() < 0.01:
             self.consider_change_job()
            
     def consume(self):
@@ -158,13 +183,31 @@ class Agent:
         self._earn_income() 
             
     def consider_change_job(self):
+        if isinstance(self.job, Academics):
+            return
+        
         opportunity = {
             'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
             'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
             'self': self.job.income
         }
-        opportunity = max(opportunity, key=opportunity.get)
+        if self.skill_level >= 3:
+            opportunity.update({'academics': ACADEMICS_FIXED_INCOME})
+
+        opportunity = max(opportunity, key=opportunity.get) # will output a job name/id
+        
+        if opportunity == 'academics':
+            available_org_ids = []
+            for org_id, org in global_orgs.items():
+                if org.get_vacancy()[opportunity] > 0:
+                    available_org_ids.append(org_id)
+            if len(available_org_ids) > 0:
+                choosen_org_id = np.random.choice(available_org_ids)
+                self.job = global_orgs[choosen_org_id].apply(self.id, opportunity)
+                return
+            else:
+                opportunity = 'self'
         if opportunity != 'self':
             self.job = job_mapping[opportunity]()
 
@@ -183,9 +226,37 @@ class Agent:
     def __str__(self) -> str:
         return f"Wealth: {self.wealth:.2f}"
 
-# class Organization:
-#     def __init__(self, title, goods_consumed, goods_produced, workers_needed) -> None:
-#         self.title = title
-#         self.goods_consumed = goods_consumed
-#         self.goods_produced = goods_produced
-#         self.workers_needed = workers_needed
+
+"""==========================================================================="""
+
+
+class Organization:
+    def __init__(self, name: str, employees_needed: dict):
+        self.name: str = name
+        self.employees_needed: dict = employees_needed
+        self.employee_ids = {}
+        self.need_employees = True
+
+    def get_vacancy(self):
+        # Calculate the difference between needed employees and the number of employees for each job
+        vacancy = {key: self.employees_needed[key] - len(self.employee_ids.get(key, [])) for key in self.employees_needed.keys()}
+        print(self.employee_ids)
+        return vacancy
+
+    def apply(self, employee_id: int, job: str):
+        """This method will be called from agent's consider_change_job. In return, the agent will receive the job instace"""
+        if job not in self.employee_ids.keys():
+            self.employee_ids[job] = []
+        self.employee_ids[job].append(employee_id)
+        return job_mapping[job]()
+    
+    def resign(self, employee_id: int, job: str):
+        """This method will be called from agent's consider_change_job"""
+        self.employee_ids[job].remove(employee_id)
+        
+class School(Organization):
+    def __init__(self):
+        super().__init__("School", employees_needed={"academics":2, "student": 40})
+        self.employees_ids = {key: [] for key in self.employees_needed.keys()}
+    
+global_orgs = {'school_1': School()}
