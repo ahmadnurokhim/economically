@@ -1,5 +1,5 @@
 from modules.consts import *
-from modules.goods import all_goods
+import modules.goods as m_goods 
 import modules.general_vars as general_vars
 
 class Job:
@@ -15,10 +15,10 @@ class Job:
     def do_the_job(self):
         global global_gdp
         for goods_name, value in self.produced.items():
-            all_goods[goods_name].supply += value
+            m_goods.goods_all[goods_name].supply += value
         for goods_name, value in self.consumed.items():
-            all_goods[goods_name].demand += value
-            general_vars.global_gdp += all_goods[goods_name].price * value
+            m_goods.goods_all[goods_name].demand += value
+            general_vars.gdp_current_month += m_goods.goods_all[goods_name].price * value
         self.update_income()
 
     def update_income(self):
@@ -31,21 +31,21 @@ class Farmer(Job):
         super().__init__("farner", 1.0, '', {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
     
     def update_income(self):
-        self.income = all_goods['food'].price * FARMER_OUTPUT_FOOD
+        self.income = m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD
     
 class Retailer(Job):
     def __init__(self) -> None:
         super().__init__("retailer", 1.0, '', {'goods_c': RETAILER_OUTPUT_GOODS}, {}) # goods_c stands for goods for consumer
 
     def update_income(self):
-        self.income = all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS
+        self.income = m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS
 
 class Driver(Job):
     def __init__(self) -> None:
         super().__init__("driver", 1.0, '', {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
 
     def update_income(self):
-        self.income = all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT
+        self.income = m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT
 
 class Academics(Job):
     def __init__(self, org_id):
@@ -78,18 +78,22 @@ job_mapping = {
 }
 
 level_1_jobs = {
-            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
-            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
-            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+            'farmer': m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
             'student': INCOME_STUDENT
         }
 level_2_jobs = {'clerk': INCOME_CLERK}
 level_3_jobs = {'academics': INCOME_ACADEMICS}
 
-def update_level_1_jobs():
+available_jobs = [Farmer(), Retailer(), Driver()]  # Available job types
+jobs_incomes = []
+
+
+def update_monthly():
     global level_1_jobs
     level_1_jobs.update({
-            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
-            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
-            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+            'farmer': m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
         })

@@ -22,8 +22,8 @@ class Organization:
         """This method will be called from agent's consider_change_job"""
         self.employee_ids[job].remove(employee_id)
     
-    def update_cash(self):
-        pass
+    def pay_salary(self, salary: float):
+        self.cash -= salary
         
 class School(Organization):
     def __init__(self, org_id: str):
@@ -32,5 +32,13 @@ class School(Organization):
 class Government(Organization):
     def __init__(self, org_id: str):
         super().__init__(org_id, employees_needed={'clerk': 100})
+        self.tax_income = 0
+    
+    def update_cash(self):
+        self.cash += self.tax_income
+        self.tax_income = 0
 
-global_orgs = {'school_1': School('school_1'), 'government': Government('government')}
+orgs_all = {'school_1': School('school_1'), 'government': Government('government')}
+
+def update_monthly():
+    orgs_all['government'].update_cash()
