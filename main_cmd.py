@@ -1,9 +1,13 @@
-import entity
 import random
-import time
 import numpy as np
 import pandas as pd
 from numerize.numerize import numerize
+import modules.jobs as m_jobs 
+import modules.agents as m_agents
+import modules.general_vars as m_vars
+import modules.goods as m_goods
+import modules.consts as m_constants
+
 
 # random.seed(20)
 # np.random.seed(20)
@@ -15,18 +19,18 @@ POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
 # Global variables
 gdp_timeline = []   # Store GDP over time
-agents = []         # List of agents in the economy
+agents_list = []         # List of agents in the economy
 agents_len = 0
 agents_num_timeline = []
 agents_wealth = []  # Store agents' wealth over time
 agents_consumption_factor = []
-available_jobs = [entity.Farmer(), entity.Retailer(), entity.Driver()]  # Available job types
+available_jobs = [m_jobs.Farmer(), m_jobs.Retailer(), m_jobs.Driver()]  # Available job types
 jobs_incomes = []
 goods_data = []     # Store data about goods each month
 
 # Initialize agents at the start of the simulation
 def initialize_agents():
-    global agents
+    global agents_list
     global agents_len
     for x in range(NUMBER_OF_AGENTS):
         # agent = entity.Agent(job=random.choice(available_jobs))
@@ -43,17 +47,16 @@ def initialize_agents():
             target_job = available_jobs[1]
         else:
             target_job = available_jobs[2]
-        agent = entity.Agent(skill_level=skill_level, job=target_job)
-        agents.append(agent)
+        agent = m_agents.Agent(skill_level=skill_level, job=target_job)
+        agents_list.append(agent)
         print(agent.id)
 
-    agents_len = len(agents)
+    agents_len = len(agents_list)
 
 # Handle the calculation and logging of GDP
 def handle_gdp():
-    global gdp_timeline
-    gdp_timeline.append(entity.global_gdp)
-    entity.global_gdp = 0
+    gdp_timeline.append(m_vars.global_gdp)
+    m_vars.global_gdp = 0
 
 # Update goods prices based on demand and supply ratios
 def update_goods_prices():
@@ -69,26 +72,26 @@ def update_goods_prices():
         'clerk': 0,
         'student': 0}
         
-    for key, goods in entity.all_goods.items():
+    for key, goods in m_goods.all_goods.items():
         goods.update_price()
-        entity.update_price_ratio(key, goods)
+        m_goods.update_price_ratio(key, goods)
         goods_this_month[key] = goods.price/goods.original_price
         goods.reset_value()
     return goods_this_month
 
 # Log to file
 def log_agent_data(agent, goods_and_jobs):
-    if isinstance(agent.job, entity.Farmer):
+    if isinstance(agent.job, m_jobs.Farmer):
         goods_and_jobs['farmer'] += 1   
-    elif isinstance(agent.job, entity.Retailer):
+    elif isinstance(agent.job, m_jobs.Retailer):
         goods_and_jobs['retailer'] += 1
-    elif isinstance(agent.job, entity.Driver):
+    elif isinstance(agent.job, m_jobs.Driver):
         goods_and_jobs['driver'] += 1
-    elif isinstance(agent.job, entity.Academics):
+    elif isinstance(agent.job, m_jobs.Academics):
         goods_and_jobs['academics'] += 1
-    elif isinstance(agent.job, entity.Clerk):
+    elif isinstance(agent.job, m_jobs.Clerk):
         goods_and_jobs['clerk'] += 1
-    elif isinstance(agent.job, entity.Student):
+    elif isinstance(agent.job, m_jobs.Student):
         goods_and_jobs['student'] += 1
     
 # Update agent activities, consumption, and record wealth
@@ -98,7 +101,7 @@ def update_agents(goods_and_jobs):
     global agents_consumption_factor
     agent_wealth = []
     agent_cons_factor = []
-    for i, agent in enumerate(agents):
+    for i, agent in enumerate(agents_list):
         agent.update()        
         agent_wealth.append(agent.wealth)
         
@@ -109,37 +112,37 @@ def update_agents(goods_and_jobs):
     agents_wealth.append(agent_wealth) 
     agents_consumption_factor.append(np.mean(agent_cons_factor))
     goods_data.append(goods_and_jobs)
-    agents_num_timeline.append(len(agents))
+    agents_num_timeline.append(len(agents_list))
 
 # Handle population growth by adding new agents
 def handle_population_growth():
     global agents_len
     agents_len *= POPULATION_GROWTH_RATE
-    needed_agent = round(agents_len-len(agents))
+    needed_agent = round(agents_len-len(agents_list))
     if needed_agent >= 1:
         for x in range(needed_agent):
             job = np.random.random()
             if job < 0.06:
-                job = entity.Farmer()
+                job = m_jobs.Farmer()
             elif job < 0.6:
-                job = entity.Retailer()
+                job = m_jobs.Retailer()
             else:
-                job = entity.Driver()
-            agent = entity.Agent(job=random.choice(available_jobs))
-            agents.append(agent)
+                job = m_jobs.Driver()
+            agent = m_agents.Agent(job=random.choice(available_jobs))
+            agents_list.append(agent)
 
 def log_job_data():
     incomes = [
-        entity.FARMER_OUTPUT_FOOD * entity.all_goods['food'].price,
-        entity.RETAILER_OUTPUT_GOODS * entity.all_goods['goods_c'].price,
-        entity.DRIVER_OUTPUT_TRANSPORT * entity.all_goods['transport'].price,
+        m_constants.FARMER_OUTPUT_FOOD * m_goods.all_goods['food'].price,
+        m_constants.RETAILER_OUTPUT_GOODS * m_goods.all_goods['goods_c'].price,
+        m_constants.DRIVER_OUTPUT_TRANSPORT * m_goods.all_goods['transport'].price,
     ]
     jobs_incomes.append(incomes)
 
 
 # Main simulation loop
 def main():
-    global agents
+    global agents_list
     global agents_len
 
     # Iterate through the simulation period
@@ -149,12 +152,14 @@ def main():
         update_agents(goods_this_month) # this variable is passed just for logging
         handle_population_growth()
         log_job_data()
-        entity.update_level_1_jobs()
+        m_jobs.update_level_1_jobs()
         # print(entity.level_1_jobs)
+        m_vars.global_gdp = m_vars.global_gdp + 1
         if _ % 10 == 0:
             print(f"Month: {_}")
+            print(f"GDP: {m_vars.global_gdp}")
             # print(entity.level_1_jobs)
-        entity.world_date += 1
+        m_vars.world_date += 1
         # time.sleep(0.1)
 
 if __name__ == "__main__":
@@ -169,4 +174,4 @@ if __name__ == "__main__":
     data['wealth_per_capita'] = data['total_wealth']/data['agents']
     # print(data)
     # print([{x.id: x.wealth} for x in agents])
-    data.to_excel('goods.xlsx')
+    data.to_excel('monthly_log.xlsx')

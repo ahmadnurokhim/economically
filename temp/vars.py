@@ -1,7 +1,3 @@
-import entity
-
-
-
 # one timestep is 1 month
 
 # building: bakery, company, school
