@@ -9,7 +9,7 @@ random.seed(20)
 np.random.seed(20)
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 600 # Total simulation months
+SIMULATION_PERIOD = 10 # Total simulation months
 NUMBER_OF_AGENTS = 3000  # Initial number of agents
 POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
@@ -37,9 +37,9 @@ def initialize_agents():
             skill_level = 2.0
         
         target_job = 0
-        if np.random.random() < 0.07:
+        if np.random.random() < 0.002:
             target_job = available_jobs[0]
-        elif np.random.random() < 0.6:
+        elif np.random.random() < 0.01:
             target_job = available_jobs[1]
         else:
             target_job = available_jobs[2]
@@ -65,7 +65,8 @@ def update_goods_prices():
         'farmer': 0,
         'retailer': 0,
         'driver': 0,
-        'academics': 0}
+        'academics': 0,
+        'clerk': 0}
         
     for key, goods in entity.all_goods.items():
         goods.update_price()
@@ -84,6 +85,8 @@ def log_agent_data(agent, goods_and_jobs):
         goods_and_jobs['driver'] += 1
     elif isinstance(agent.job, entity.Academics):
         goods_and_jobs['academics'] += 1
+    elif isinstance(agent.job, entity.Clerk):
+        goods_and_jobs['clerk'] += 1
     
 # Update agent activities, consumption, and record wealth
 def update_agents(goods_and_jobs):
@@ -143,8 +146,7 @@ def main():
         update_agents(goods_this_month) # this variable is passed just for logging
         handle_population_growth()
         log_job_data()
-        if _ % 10 == 0:
-            print(f"Month: {_}")
+        print(f"Month: {_}")
         # time.sleep(0.1)
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import truncnorm 
 
 GOODS_MAX_PRICE_MULTIPLIER = 2
 GOODS_MIN_PRICE_MULTIPLIER = 0.25
@@ -15,7 +16,6 @@ INCOME_WORKER = 280
 FARMER_OUTPUT_FOOD = 160.0          # 150
 RETAILER_OUTPUT_GOODS = 120.0       # 130
 DRIVER_OUTPUT_TRANSPORT = 1500.0    # 1500
-ACADEMICS_FIXED_INCOME = 400
 
 AGENT_DEFAULT_CONSUMPTION = {
     'food': 7.0,
@@ -31,6 +31,9 @@ AGENT_HIGH_WEALTH_THRESHOLD = 5000 # IN USD
 AGENT_ID = 0
 
 global_gdp = 0
+
+def truncnorm_generator(lower: float, upper:float, loc=1, scale=0.1, size=1):
+    return truncnorm.rvs((lower-loc)/scale, (upper-loc)/scale, loc=loc, scale=scale, size=size)
 
 class Goods:
     def __init__(self, name:str, price:float) -> None:
@@ -99,6 +102,7 @@ class Job:
         for goods_name, value in self.consumed.items():
             all_goods[goods_name].demand += value
             global_gdp += all_goods[goods_name].price * value
+        self.update_income()
 
     def update_income(self):
         return
@@ -150,6 +154,14 @@ job_mapping = {
     'clerk': Clerk
 }
 
+level_1_jobs = {
+            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+        }
+level_2_jobs = {'clerk': INCOME_CLERK}
+level_3_jobs = {'academics': INCOME_ACADEMICS}
+
 
 """==========================================================================="""
 
@@ -159,11 +171,12 @@ class Agent:
         """All consumption measured monthly. food in kg, goods_c in unit, and transport in km"""
         global AGENT_ID
         self.id = AGENT_ID
-        self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/20))    # USD
+        self.wealth: float = max(0, np.random.normal(initial_wealth, initial_wealth/10))    # USD
         self.latest_spending = 0
         # self.skill_level: float = np.random.normal(skill_level, skill_level/5)
         self.skill_level = skill_level
-        self.consumption: dict = {key: np.random.normal(value, value/20) for key, value in consumption.items()}
+        # self.consumption: dict = {key: min(value * AGENT_MIN_CONSUMPTION_FACTOR, max(value * AGENT_MAX_CONSUMPTION_FACTOR, np.random.normal(value, value/5))) for key, value in consumption.items()}
+        self.consumption = consumption
         self.consumption_factor = 1.0
         self.job: Job = job
         
@@ -189,16 +202,7 @@ class Agent:
         self.latest_spending = money_spent
         
     def update_consumption_factor(self):
-        # Based on wealth
-        # if self.wealth < AGENT_LOW_WEALTH_THRESHOLD:
-        #     self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
-        # elif self.wealth >= AGENT_LOW_WEALTH_THRESHOLD and self.wealth < AGENT_HIGH_WEALTH_THRESHOLD:
-        #     if self.consumption_factor < 1.0:
-        #         self.consumption_factor = min(self.consumption_factor + 0.05, 1)
-        #     elif self.consumption_factor > 1.0:
-        #         self.consumption_factor = max(self.consumption_factor - 0.05, 1)
-        # elif self.wealth >= AGENT_HIGH_WEALTH_THRESHOLD and np.random.random() < 0.1:
-        #     self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
+        # Based on self profit
         self_profit = self.job.income - self.latest_spending
         if self_profit > 100:
             self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
@@ -211,38 +215,17 @@ class Agent:
         self._perform_job()
         self._earn_income() 
             
-    def consider_change_job(self):
-        if isinstance(self.job, Academics):
-            return
+    def consider_change_job(self):        
+        # Dict all the income of level 1 jobs, and add self income
+        opportunity = level_1_jobs.copy() # Make a copy to prevent modifying the original dictionary
+        opportunity.update({'self': self.job.income})
         
-        opportunity = {
-            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
-            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
-            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
-            'self': self.job.income
-        }
-        if self.skill_level >= 3.0:
-            level_3_jobs = {'academics': ACADEMICS_FIXED_INCOME}
-            opportunity.update(level_3_jobs)
-            best_opportunity = max(opportunity, key=opportunity.get) # will output a job name/id
-        
-            if best_opportunity in level_3_jobs.keys():
-                # Checking the available jobs
-                available_org_ids = []
-                for org_id, org in global_orgs.items():
-                    vacancy_for_current_org = org.get_vacancy()
-                    if best_opportunity in vacancy_for_current_org.keys():
-                        if vacancy_for_current_org[best_opportunity] > 0:
-                            available_org_ids.append(org_id)
-
-                if len(available_org_ids) > 0:
-                    chosen_org_id = np.random.choice(available_org_ids)
-                    self.job = global_orgs[chosen_org_id].apply(self.id, best_opportunity)
-                    return
-            opportunity.pop('academics')
-        best_opportunity = max(opportunity, key=opportunity.get)
-        if best_opportunity != 'self':
-            self.job = job_mapping[best_opportunity]()
+        # If agent skill is 2 or more, add level 2 jobs to the dictionary
+        if self.skill_level >= 2.0:
+            opportunity.update(level_2_jobs)
+            if self.skill_level >= 3.0:
+                opportunity.update(level_3_jobs)
+            return self._search_for_vacancy_and_apply(opportunity) # Try to change job recursively
 
     def _update_global_demand(self, goods_name: str, value: float):
         all_goods[goods_name].demand += value
@@ -254,7 +237,39 @@ class Agent:
         self.job.do_the_job()
 
     def _earn_income(self):
-        self.wealth += self.job.income
+        self.wealth += self.job.income #* np.random.normal(1, 0.01)
+    
+    def _search_for_vacancy_and_apply(self, opportunity: dict): # Return true if job changing successful
+        if not opportunity:  # Terminate recursion if no opportunities are left
+            print("XX NO OPPORTUNITY")
+            return False
+        
+        best_opportunity = max(opportunity, key=opportunity.get)
+        if best_opportunity not in level_1_jobs.keys(): # check if the best is not level 1 jobs (because level 1 jobs dont need to apply)
+            # List all org that has vacancy
+            org_name_that_has_vacancy = [
+                org_name for org_name, org in global_orgs.items()
+                if best_opportunity in org.get_vacancy_dict().keys() and org.get_vacancy_dict()[best_opportunity] > 0
+            ]
+            
+            if org_name_that_has_vacancy: # check if if there are vacancy and try to apply
+                org_to_apply = np.random.choice(org_name_that_has_vacancy)
+                self.job = global_orgs[org_to_apply].apply(self.id, best_opportunity)
+                print(f"O  JOB CHANGED TO {best_opportunity}")
+                return True
+            else: # Do this instead if no vacancy available for current best opportunity
+                opportunity.pop(best_opportunity)
+                print(f"   NO VACANCY FOR {best_opportunity} RETRYING")
+                return self._search_for_vacancy_and_apply(opportunity) # Redo all again, with the same opportunity dict, but without the last job that has no vacancy
+
+        else: # if the best opportunity is level 1 job
+            if best_opportunity != 'self': # If the key is not 'self', change the job
+                self.job = job_mapping[best_opportunity]()
+                print("O  JOB CHANGED TO LV 1")
+                return True
+            print("XX BEST IS CURRENT")
+            return False # False because the best is still current job
+        
 
     def __str__(self) -> str:
         return f"Wealth: {self.wealth:.2f}"
@@ -271,7 +286,7 @@ class Organization:
         self.employee_ids = {key: [] for key in self.employees_needed.keys()}
         self.need_employees = True
 
-    def get_vacancy(self):
+    def get_vacancy_dict(self):
         # Calculate the difference between needed employees and the number of employees for each job
         vacancy = {key: self.employees_needed[key] - len(self.employee_ids[key]) for key in self.employees_needed.keys()}
         return vacancy # return a dict with job (key) and vacancy (value)
@@ -296,7 +311,7 @@ class School(Organization):
     
 class Government(Organization):
     def __init__(self):
-        super().__init__('Government', employees_needed={'clerk': 20})
+        super().__init__('Government', employees_needed={'clerk': 2})
 
 global_orgs = {'school_1': School(), 'government': Government()}
 
