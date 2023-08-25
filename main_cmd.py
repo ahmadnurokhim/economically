@@ -9,7 +9,7 @@ random.seed(20)
 np.random.seed(20)
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 10 # Total simulation months
+SIMULATION_PERIOD = 300 # Total simulation months
 NUMBER_OF_AGENTS = 3000  # Initial number of agents
 POPULATION_GROWTH_RATE = 1.00105 # Monthly population growth factor
 
@@ -37,9 +37,9 @@ def initialize_agents():
             skill_level = 2.0
         
         target_job = 0
-        if np.random.random() < 0.002:
+        if np.random.random() < 0.06:
             target_job = available_jobs[0]
-        elif np.random.random() < 0.01:
+        elif np.random.random() < 0.6:
             target_job = available_jobs[1]
         else:
             target_job = available_jobs[2]
@@ -116,9 +116,9 @@ def handle_population_growth():
     if needed_agent >= 1:
         for x in range(needed_agent):
             job = np.random.random()
-            if job < 0.6:
+            if job < 0.06:
                 job = entity.Farmer()
-            elif job < 0.8:
+            elif job < 0.6:
                 job = entity.Retailer()
             else:
                 job = entity.Driver()
@@ -146,7 +146,11 @@ def main():
         update_agents(goods_this_month) # this variable is passed just for logging
         handle_population_growth()
         log_job_data()
-        print(f"Month: {_}")
+        entity.update_level_1_jobs()
+        # print(entity.level_1_jobs)
+        if _ % 10 == 0:
+            print(f"Month: {_}")
+            # print(entity.level_1_jobs)
         # time.sleep(0.1)
 
 if __name__ == "__main__":

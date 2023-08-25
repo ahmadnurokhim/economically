@@ -162,6 +162,13 @@ level_1_jobs = {
 level_2_jobs = {'clerk': INCOME_CLERK}
 level_3_jobs = {'academics': INCOME_ACADEMICS}
 
+def update_level_1_jobs():
+    global level_1_jobs
+    level_1_jobs = {
+            'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+        }
 
 """==========================================================================="""
 
@@ -219,13 +226,13 @@ class Agent:
         # Dict all the income of level 1 jobs, and add self income
         opportunity = level_1_jobs.copy() # Make a copy to prevent modifying the original dictionary
         opportunity.update({'self': self.job.income})
-        
+
         # If agent skill is 2 or more, add level 2 jobs to the dictionary
         if self.skill_level >= 2.0:
             opportunity.update(level_2_jobs)
             if self.skill_level >= 3.0:
                 opportunity.update(level_3_jobs)
-            return self._search_for_vacancy_and_apply(opportunity) # Try to change job recursively
+        return self._search_for_vacancy_and_apply(opportunity) # Try to change job recursively
 
     def _update_global_demand(self, goods_name: str, value: float):
         all_goods[goods_name].demand += value
@@ -241,10 +248,15 @@ class Agent:
     
     def _search_for_vacancy_and_apply(self, opportunity: dict): # Return true if job changing successful
         if not opportunity:  # Terminate recursion if no opportunities are left
-            print("XX NO OPPORTUNITY")
             return False
-        
+
         best_opportunity = max(opportunity, key=opportunity.get)
+        if best_opportunity == 'self':
+            return False  # Return false if the current job is best
+
+        if opportunity[best_opportunity] < opportunity['self'] * 1.05:
+            return False # Return false if best opportunity is not more than 10% higher income than current
+        
         if best_opportunity not in level_1_jobs.keys(): # check if the best is not level 1 jobs (because level 1 jobs dont need to apply)
             # List all org that has vacancy
             org_name_that_has_vacancy = [
@@ -255,20 +267,14 @@ class Agent:
             if org_name_that_has_vacancy: # check if if there are vacancy and try to apply
                 org_to_apply = np.random.choice(org_name_that_has_vacancy)
                 self.job = global_orgs[org_to_apply].apply(self.id, best_opportunity)
-                print(f"O  JOB CHANGED TO {best_opportunity}")
                 return True
             else: # Do this instead if no vacancy available for current best opportunity
                 opportunity.pop(best_opportunity)
-                print(f"   NO VACANCY FOR {best_opportunity} RETRYING")
                 return self._search_for_vacancy_and_apply(opportunity) # Redo all again, with the same opportunity dict, but without the last job that has no vacancy
 
         else: # if the best opportunity is level 1 job
-            if best_opportunity != 'self': # If the key is not 'self', change the job
-                self.job = job_mapping[best_opportunity]()
-                print("O  JOB CHANGED TO LV 1")
-                return True
-            print("XX BEST IS CURRENT")
-            return False # False because the best is still current job
+            self.job = job_mapping[best_opportunity]()
+            return True
         
 
     def __str__(self) -> str:
@@ -311,7 +317,7 @@ class School(Organization):
     
 class Government(Organization):
     def __init__(self):
-        super().__init__('Government', employees_needed={'clerk': 2})
+        super().__init__('Government', employees_needed={'clerk': 80})
 
 global_orgs = {'school_1': School(), 'government': Government()}
 
