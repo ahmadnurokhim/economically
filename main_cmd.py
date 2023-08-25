@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from numerize.numerize import numerize
 
-random.seed(20)
-np.random.seed(20)
+# random.seed(20)
+# np.random.seed(20)
 
 # Constants for simulation settings
 SIMULATION_PERIOD = 300 # Total simulation months
@@ -66,7 +66,8 @@ def update_goods_prices():
         'retailer': 0,
         'driver': 0,
         'academics': 0,
-        'clerk': 0}
+        'clerk': 0,
+        'student': 0}
         
     for key, goods in entity.all_goods.items():
         goods.update_price()
@@ -87,6 +88,8 @@ def log_agent_data(agent, goods_and_jobs):
         goods_and_jobs['academics'] += 1
     elif isinstance(agent.job, entity.Clerk):
         goods_and_jobs['clerk'] += 1
+    elif isinstance(agent.job, entity.Student):
+        goods_and_jobs['student'] += 1
     
 # Update agent activities, consumption, and record wealth
 def update_agents(goods_and_jobs):
@@ -151,6 +154,7 @@ def main():
         if _ % 10 == 0:
             print(f"Month: {_}")
             # print(entity.level_1_jobs)
+        entity.world_date += 1
         # time.sleep(0.1)
 
 if __name__ == "__main__":

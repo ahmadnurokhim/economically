@@ -30,6 +30,7 @@ AGENT_HIGH_WEALTH_THRESHOLD = 5000 # IN USD
 AGENT_ID = 0
 
 global_gdp = 0
+world_date = 0
 
 class Goods:
     def __init__(self, name:str, price:float) -> None:
@@ -83,13 +84,14 @@ def update_price_ratio(key, goods: Goods):
 
 
 class Job:
-    def __init__(self, title: str, required_skill: float, produced: dict, consumed: dict) -> None:
+    def __init__(self, title: str, required_skill: float, org_id: str, produced: dict, consumed: dict) -> None:
         self.title = title
         self.income = 0
         self.required_skill = required_skill
         self.produced = produced
         self.consumed = consumed
         self.update_income()
+        self.org_id = org_id
 
     def do_the_job(self):
         global global_gdp
@@ -107,38 +109,44 @@ class Farmer(Job):
     def __init__(self) -> None:
         """Farm measured in 1 ha. 1 ha produced 5400 kg of food per semester, which worked by 6 people.
         So, monthly, it produces 150 kg per person"""
-        super().__init__("Farner", 1.0, {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
+        super().__init__("farner", 1.0, '', {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
     
     def update_income(self):
         self.income = all_goods['food'].price * FARMER_OUTPUT_FOOD
     
 class Retailer(Job):
     def __init__(self) -> None:
-        super().__init__("Retailer", 1.0, {'goods_c': RETAILER_OUTPUT_GOODS}, {}) # goods_c stands for goods for consumer
+        super().__init__("retailer", 1.0, '', {'goods_c': RETAILER_OUTPUT_GOODS}, {}) # goods_c stands for goods for consumer
 
     def update_income(self):
         self.income = all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS
 
 class Driver(Job):
     def __init__(self) -> None:
-        super().__init__("Driver", 1.0, {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
+        super().__init__("driver", 1.0, '', {'transport': DRIVER_OUTPUT_TRANSPORT}, {})
 
     def update_income(self):
         self.income = all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT
 
 class Academics(Job):
-    def __init__(self):
-        super().__init__("Academics", 3.0, produced={}, consumed={})
+    def __init__(self, org_id):
+        super().__init__("academics", 3.0, org_id, produced={}, consumed={})
         self.income = INCOME_ACADEMICS
 
 class Student(Job):
-    def __init__(self):
-        super().__init__("Student", 1.0, produced={}, consumed={})
+    def __init__(self, org_id):
+        super().__init__("student", 1.0, org_id, produced={}, consumed={})
         self.income = INCOME_STUDENT
+        self.enroll_date = world_date
+        self.graduate_date = self.enroll_date + 48
+    
+    def is_graduated(self):
+        if world_date >= self.graduate_date:
+            return True
 
 class Clerk(Job):
-    def __init__(self) -> None:
-        super().__init__("Clerk", 2.0, produced={}, consumed={})
+    def __init__(self, org_id) -> None:
+        super().__init__("clerk", 2.0, org_id, produced={}, consumed={})
         self.income = INCOME_CLERK
 
 job_mapping = {
@@ -154,17 +162,18 @@ level_1_jobs = {
             'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
             'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+            'student': INCOME_STUDENT
         }
 level_2_jobs = {'clerk': INCOME_CLERK}
 level_3_jobs = {'academics': INCOME_ACADEMICS}
 
 def update_level_1_jobs():
     global level_1_jobs
-    level_1_jobs = {
+    level_1_jobs.update({
             'farmer': all_goods['food'].price * FARMER_OUTPUT_FOOD,
             'retailer': all_goods['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver': all_goods['transport'].price * DRIVER_OUTPUT_TRANSPORT,
-        }
+        })
 
 """==========================================================================="""
 
@@ -189,8 +198,9 @@ class Agent:
         self.consume()
         self.update_consumption_factor()
         self.work()
-        if np.random.random() < 0.01:
-            self.consider_change_job()
+        if not isinstance(self.job, Student): # Dont consider change job if student
+            if np.random.random() < 0.01:
+                self.consider_change_job()
            
     def consume(self):
         global global_gdp
@@ -216,9 +226,13 @@ class Agent:
 
     def work(self):
         self._perform_job()
-        self._earn_income() 
+        self._earn_income()
+        if isinstance(self.job, Student):
+            if self.job.is_graduated():
+                global_orgs[self.job.org_id].resign(self.id, self.job.title)
+                self.job = Driver() # Student will become driver after graduated
             
-    def consider_change_job(self):        
+    def consider_change_job(self):
         # Dict all the income of level 1 jobs, and add self income
         opportunity = level_1_jobs.copy() # Make a copy to prevent modifying the original dictionary
         opportunity.update({'self': self.job.income})
@@ -228,6 +242,7 @@ class Agent:
             opportunity.update(level_2_jobs)
             if self.skill_level >= 3.0:
                 opportunity.update(level_3_jobs)
+
         return self._search_for_vacancy_and_apply(opportunity) # Try to change job recursively
 
     def _update_global_demand(self, goods_name: str, value: float):
@@ -247,23 +262,28 @@ class Agent:
             return False
 
         best_opportunity = max(opportunity, key=opportunity.get)
+
         if best_opportunity == 'self':
             return False  # Return false if the current job is best
-
-        if opportunity[best_opportunity] < opportunity['self'] * 1.05:
-            return False # Return false if best opportunity is not more than 10% higher income than current
         
-        if best_opportunity not in level_1_jobs.keys(): # check if the best is not level 1 jobs (because level 1 jobs dont need to apply)
+        if opportunity[best_opportunity] < opportunity['self'] * 1.05:
+            return False # Return false if best opportunity is not more than 5% higher income than current
+
+        if 'student' in opportunity.keys() and (self.wealth > 2 * -INCOME_STUDENT * 48): # 48 months
+            best_opportunity = 'student' # If student is in option, and enough wealth
+
+        if best_opportunity not in level_1_jobs.keys() or best_opportunity == 'student': # check if the best is not level 1 jobs (because level 1 jobs dont need to apply)
             # List all org that has vacancy
             org_name_that_has_vacancy = [
                 org_name for org_name, org in global_orgs.items()
                 if best_opportunity in org.get_vacancy_dict().keys() and org.get_vacancy_dict()[best_opportunity] > 0
             ]
-            
+
             if org_name_that_has_vacancy: # check if if there are vacancy and try to apply
                 org_to_apply = np.random.choice(org_name_that_has_vacancy)
-                self.job = global_orgs[org_to_apply].apply(self.id, best_opportunity)
-                return True
+                if global_orgs[org_to_apply].apply(self.id, best_opportunity): # if application success
+                    self.job = job_mapping[best_opportunity](org_id=org_to_apply)
+                    return True
             else: # Do this instead if no vacancy available for current best opportunity
                 opportunity.pop(best_opportunity)
                 return self._search_for_vacancy_and_apply(opportunity) # Redo all again, with the same opportunity dict, but without the last job that has no vacancy
@@ -281,8 +301,8 @@ class Agent:
 
 
 class Organization:
-    def __init__(self, name: str, employees_needed: dict):
-        self.name: str = name
+    def __init__(self, org_id: str, employees_needed: dict):
+        self.org_id: str = org_id
         self.cash = 0
         self.employees_needed: dict = employees_needed
         self.employee_ids = {key: [] for key in self.employees_needed.keys()}
@@ -298,7 +318,7 @@ class Organization:
         if job not in self.employee_ids.keys():
             self.employee_ids[job] = []
         self.employee_ids[job].append(employee_id)
-        return job_mapping[job]()
+        return True
     
     def resign(self, employee_id: int, job: str):
         """This method will be called from agent's consider_change_job"""
@@ -308,14 +328,14 @@ class Organization:
         pass
         
 class School(Organization):
-    def __init__(self):
-        super().__init__("School", employees_needed={"academics":2, "student": 40})
+    def __init__(self, org_id: str):
+        super().__init__(org_id, employees_needed={"academics":2, "student": 40})
     
 class Government(Organization):
-    def __init__(self):
-        super().__init__('Government', employees_needed={'clerk': 100})
+    def __init__(self, org_id: str):
+        super().__init__(org_id, employees_needed={'clerk': 100})
 
-global_orgs = {'school_1': School(), 'government': Government()}
+global_orgs = {'school_1': School('school_1'), 'government': Government('government')}
 
 # farm*
 # produce: food
