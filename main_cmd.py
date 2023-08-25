@@ -31,15 +31,15 @@ def initialize_agents():
     for x in range(NUMBER_OF_AGENTS):
         # agent = entity.Agent(job=random.choice(available_jobs))
         skill_level = 1.0
-        if np.random.random() < 0.01:
-            skill_level = 3.0
-        elif np.random.random() < 0.1:
+        if np.random.random() < 0.005:
+            skill_level = 2.0
+        elif np.random.random() < 0.001:
             skill_level = 2.0
         
         target_job = 0
         if np.random.random() < 0.06:
             target_job = available_jobs[0]
-        elif np.random.random() < 0.6:
+        elif np.random.random() < 0.1:
             target_job = available_jobs[1]
         else:
             target_job = available_jobs[2]

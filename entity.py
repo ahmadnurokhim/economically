@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.stats import truncnorm 
 
 GOODS_MAX_PRICE_MULTIPLIER = 2
 GOODS_MIN_PRICE_MULTIPLIER = 0.25
@@ -31,9 +30,6 @@ AGENT_HIGH_WEALTH_THRESHOLD = 5000 # IN USD
 AGENT_ID = 0
 
 global_gdp = 0
-
-def truncnorm_generator(lower: float, upper:float, loc=1, scale=0.1, size=1):
-    return truncnorm.rvs((lower-loc)/scale, (upper-loc)/scale, loc=loc, scale=scale, size=size)
 
 class Goods:
     def __init__(self, name:str, price:float) -> None:
@@ -213,10 +209,10 @@ class Agent:
         self_profit = self.job.income - self.latest_spending
         if self_profit > 100:
             self.consumption_factor = min(self.consumption_factor + 0.05, AGENT_MAX_CONSUMPTION_FACTOR)
-        elif self_profit < 0:
+        elif self_profit < 10:
             self.consumption_factor = max(self.consumption_factor - 0.05, AGENT_MIN_CONSUMPTION_FACTOR)
         else:
-            self.consumption_factor += np.random.choice([0.05, -0.05])
+            self.consumption_factor = min(max(self.consumption_factor + np.random.choice([0.05, -0.05]), AGENT_MIN_CONSUMPTION_FACTOR), AGENT_MAX_CONSUMPTION_FACTOR)
 
     def work(self):
         self._perform_job()
@@ -317,7 +313,7 @@ class School(Organization):
     
 class Government(Organization):
     def __init__(self):
-        super().__init__('Government', employees_needed={'clerk': 80})
+        super().__init__('Government', employees_needed={'clerk': 100})
 
 global_orgs = {'school_1': School(), 'government': Government()}
 
