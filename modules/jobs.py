@@ -1,6 +1,6 @@
 from modules.consts import *
 import modules.goods as m_goods 
-import modules.general_vars as general_vars
+import modules.general_vars as m_vars
 
 class Job:
     def __init__(self, title: str, required_skill: float, org_id: str, produced: dict, consumed: dict) -> None:
@@ -18,7 +18,7 @@ class Job:
             m_goods.goods_all[goods_name].supply += value
         for goods_name, value in self.consumed.items():
             m_goods.goods_all[goods_name].demand += value
-            general_vars.gdp_current_month += m_goods.goods_all[goods_name].price * value
+            m_vars.gdp_current_month += m_goods.goods_all[goods_name].price * value
         self.update_income()
 
     def update_income(self):
@@ -28,7 +28,7 @@ class Farmer(Job):
     def __init__(self) -> None:
         """Farm measured in 1 ha. 1 ha produced 5400 kg of food per semester, which worked by 6 people.
         So, monthly, it produces 150 kg per person"""
-        super().__init__("farner", 1.0, '', {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
+        super().__init__("farmer", 1.0, '', {'food': FARMER_OUTPUT_FOOD}, {'transport': 0.5})
     
     def update_income(self):
         self.income = m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD
@@ -56,11 +56,11 @@ class Student(Job):
     def __init__(self, org_id):
         super().__init__("student", 1.0, org_id, produced={}, consumed={})
         self.income = INCOME_STUDENT
-        self.enroll_date = general_vars.world_date
+        self.enroll_date = m_vars.world_date
         self.graduate_date = self.enroll_date + 48
     
     def is_graduated(self):
-        if general_vars.world_date >= self.graduate_date:
+        if m_vars.world_date >= self.graduate_date:
             return True
 
 class Clerk(Job):
@@ -87,13 +87,19 @@ level_2_jobs = {'clerk': INCOME_CLERK}
 level_3_jobs = {'academics': INCOME_ACADEMICS}
 
 available_jobs = [Farmer(), Retailer(), Driver()]  # Available job types
-jobs_incomes = []
-
+jobs_incomes_log = []
+jobs_type_log = []
 
 def update_monthly():
     global level_1_jobs
+    global jobs_incomes_log
     level_1_jobs.update({
             'farmer': m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD,
             'retailer': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
+        })
+    jobs_incomes_log.append({
+            'farmer_income': m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD,
+            'retailer_income': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
+            'driver_income': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
         })

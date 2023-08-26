@@ -2,6 +2,13 @@ gdp_current_month = 0
 gdp_timeline = []   # Store GDP over time
 world_date = 0
 
+def update_gdp():
+    global gdp_timeline
+    gdp_timeline.append(gdp_current_month)
+
+def reset_gdp():
+    global gdp_current_month
+    gdp_current_month = 0
 
 # farm*
 # produce: food

@@ -1,10 +1,11 @@
 import numpy as np
+import random
 from modules.consts import *
 import modules.jobs as m_jobs
 from modules.jobs import job_mapping, level_1_jobs, level_2_jobs, level_3_jobs
-from modules.goods import goods_all
+import modules.goods as m_goods 
 import modules.organizations as m_orgs
-import modules.general_vars as general_vars
+import modules.general_vars as m_vars
 
 class Agent:
     def __init__(self, initial_wealth=200.0, skill_level=1.0, consumption=AGENT_DEFAULT_CONSUMPTION, job=None) -> None:
@@ -28,19 +29,19 @@ class Agent:
         self.work()
         self.pay_tax()
         if not isinstance(self.job, m_jobs.Student): # Dont consider change job if student
-            if np.random.random() < 0.05:
+            if np.random.random() < 0.01:
                 self.consider_change_job()
            
     def consume(self):
         money_spent = 0
         for goods_name, value in self.consumption.items():
             actual_consumption = value * self.consumption_factor # actual consumption for current goods  
-            self._update_global_demand(goods_name, actual_consumption)
-            money_spent_on_this_goods = goods_all[goods_name].price * actual_consumption
-            self._update_wealth(money_spent_on_this_goods)
+            self._update_global_demand(goods_name, actual_consumption)  # add this agent's demand to global demand
+            money_spent_on_this_goods = m_goods.goods_all[goods_name].price * actual_consumption # calculate money spent on this goods
+            self._update_wealth(money_spent_on_this_goods) # subtract money spent from wealth
             money_spent += money_spent_on_this_goods
-            general_vars.gdp_current_month += money_spent_on_this_goods
-        self.latest_spending = money_spent
+        m_vars.gdp_current_month += money_spent # add this agent's spent to GDP
+        self.latest_spending = money_spent # update this agent's latest spending
         
     def update_consumption_factor(self):
         # Based on self profit
@@ -90,7 +91,7 @@ class Agent:
             m_orgs.orgs_all['government'].tax_income += tax
 
     def _update_global_demand(self, goods_name: str, value: float):
-        goods_all[goods_name].demand += value
+        m_goods.goods_all[goods_name].demand += value
 
     def _update_wealth(self, money: float):
         self.wealth -= money
@@ -143,7 +144,45 @@ class Agent:
         return f"Wealth: {self.wealth:.2f}"
 
 agents_list = []         # List of agents in the economy
-agents_len = 0
-agents_num_timeline = []
-agents_wealth = []  # Store agents' wealth over time
-agents_consumption_factor = []
+agents_len_curr_predicted = 0
+agents_count_log = []   # Store agent count over time
+agents_wealth_log = []  # Store agents' wealth over time
+agents_consumption_factor_log = []
+agents_avg_skill_log = []
+
+def update_monthly():
+    wealth_of_all_agents = []
+    cons_factor_of_all_agents = []
+    skill_of_all_agent = []
+
+    jobs_of_all_agent = {key: 0 for key in m_jobs.job_mapping.keys()}
+    agent: Agent
+    for agent in agents_list:
+        agent.update()
+        wealth_of_all_agents.append(agent.wealth)
+        cons_factor_of_all_agents.append(agent.consumption_factor)
+        jobs_of_all_agent[agent.job.title] += 1
+        skill_of_all_agent.append(agent.skill_level)
+    
+    agents_count_log.append(len(agents_list))
+    agents_wealth_log.append(np.sum(wealth_of_all_agents))
+    agents_consumption_factor_log.append(np.mean(cons_factor_of_all_agents))
+    agents_avg_skill_log.append(np.mean(skill_of_all_agent))
+    m_jobs.jobs_type_log.append(jobs_of_all_agent)
+    handle_population_growth()
+
+def handle_population_growth():
+    global agents_len_curr_predicted
+    agents_len_curr_predicted *= POPULATION_GROWTH_RATE
+    needed_agent = round(agents_len_curr_predicted-len(agents_list))
+    if needed_agent >= 1:
+        for x in range(needed_agent):
+            job = np.random.random()
+            if job < 0.06:
+                job = m_jobs.Farmer()
+            elif job < 0.6:
+                job = m_jobs.Retailer()
+            else:
+                job = m_jobs.Driver()
+            agent = Agent(job=random.choice(m_jobs.available_jobs))
+            agents_list.append(agent)

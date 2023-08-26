@@ -15,7 +15,7 @@ class Goods:
     def update_price(self):
         if self.name in STABLE_GOODS:
             return
-        
+        # print(self.supply, self.demand)
         if self.previous_supply != 0:
             multiplier = self.demand / self.previous_supply
         else:
@@ -44,8 +44,17 @@ goods_all = {
     'transport': Goods('transport', 0.12),
     'energy': Goods('energy', ENERGY_PRICE)
 }
-goods_all_price_ratio = {}
-goods_data = []     # Store data about goods each month
+goods_log = []     # Store data about goods each month
 
-def update_price_ratio(key, goods: Goods):
-    goods_all_price_ratio[key] = goods.price / goods.original_price
+def update_monthly():
+    global goods_log
+    global goods_all
+    goods_price_ratio_this_month = {key: 0 for key in goods_all.keys()}
+    for key, goods in goods_all.items(): # for all goods, store the price ratio and then reset the demand & supply
+        goods.update_price() # update the price
+        goods_price_ratio_this_month[key] = goods.price / goods.original_price # update the price ratio
+    goods_log.append(goods_price_ratio_this_month)
+
+def reset_goods_supply_demand():
+    for goods in goods_all.values():
+        goods.reset_value()
