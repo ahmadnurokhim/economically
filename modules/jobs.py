@@ -68,13 +68,18 @@ class Clerk(Job):
         super().__init__("clerk", 2.0, org_id, produced={}, consumed={})
         self.income = INCOME_CLERK
 
+class Specialist(Job):
+    def __init__(self, org_id: str) -> None:
+        super().__init__("specialist", 3.0, org_id, produced={}, consumed={})
+
 job_mapping = {
     'farmer': Farmer,
     'retailer': Retailer,
     'driver': Driver,
-    'academics': Academics,
     'student': Student,
-    'clerk': Clerk
+    'clerk': Clerk,
+    'academics': Academics,
+    'specialist': Specialist
 }
 
 level_1_jobs = {
@@ -84,7 +89,7 @@ level_1_jobs = {
             'student': INCOME_STUDENT
         }
 level_2_jobs = {'clerk': INCOME_CLERK}
-level_3_jobs = {'academics': INCOME_ACADEMICS}
+level_3_jobs = {'academics': INCOME_ACADEMICS, 'specialist': INCOME_SPECIALIST}
 
 available_jobs = [Farmer(), Retailer(), Driver()]  # Available job types
 jobs_incomes_log = []
@@ -103,3 +108,4 @@ def update_monthly():
             'retailer_income': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver_income': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
         })
+    

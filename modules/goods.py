@@ -51,6 +51,8 @@ def update_monthly():
     global goods_all
     goods_price_ratio_this_month = {key: 0 for key in goods_all.keys()}
     for key, goods in goods_all.items(): # for all goods, store the price ratio and then reset the demand & supply
+        if key == 'food':
+            print(goods.demand)
         goods.update_price() # update the price
         goods_price_ratio_this_month[key] = goods.price / goods.original_price # update the price ratio
     goods_log.append(goods_price_ratio_this_month)

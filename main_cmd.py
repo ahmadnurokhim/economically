@@ -13,7 +13,7 @@ import modules.organizations as m_orgs
 # np.random.seed(20)
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 200 # Total simulation months
+SIMULATION_PERIOD = 300 # Total simulation months
 NUMBER_OF_AGENTS = 3000  # Initial number of agents
 
 # Initialize agents at the start of the simulation
@@ -29,7 +29,7 @@ def initialize_agents():
         target_job = 0
         if np.random.random() < 0.06:
             target_job: m_jobs.Job = m_jobs.available_jobs[0]
-        elif np.random.random() < 0.1:
+        elif np.random.random() < 0.6:
             target_job: m_jobs.Job = m_jobs.available_jobs[1]
         else:
             target_job: m_jobs.Job = m_jobs.available_jobs[2]
@@ -39,9 +39,6 @@ def initialize_agents():
 
     m_agents.agents_len_curr_predicted = len(m_agents.agents_list)
 
-# Handle the calculation and logging of GDP
-
-
 # Main simulation loop
 def main():
     # Iterate through the simulation period
@@ -49,13 +46,8 @@ def main():
         m_agents.update_monthly()
         m_goods.update_monthly()
         m_jobs.update_monthly()
-        if _ % 10 == 0:
-            print(f"Govt tax in: ${numerize(m_orgs.orgs_all['government'].tax_income)}")
         m_orgs.update_monthly()
         m_vars.update_gdp()
-        if _ % 10 == 0:
-            print(f"Month: {_}")
-            print(f"GDP: ${numerize(m_vars.gdp_current_month)}")
         m_goods.reset_goods_supply_demand()
         m_vars.reset_gdp()
         m_vars.world_date += 1
@@ -68,19 +60,27 @@ def logs_to_files():
     agents_log_df_4 = pd.DataFrame(m_agents.agents_avg_skill_log)
     agents_log_df = pd.concat([agents_log_df_1, agents_log_df_2, agents_log_df_3, agents_log_df_4], axis=1)
     agents_log_df.columns = ['ag_cout', 'wealth', 'cons_f', 'avg_skill']
+    agent_status_df = pd.DataFrame(m_agents.agent_latest_status)
+    
     goods_log_df = pd.DataFrame(m_goods.goods_log)
+    
     jobs_income_log_df = pd.DataFrame(m_jobs.jobs_incomes_log)
     jobs_type_log_df = pd.DataFrame(m_jobs.jobs_type_log)
     jobs_log_df = pd.concat([jobs_type_log_df, jobs_income_log_df], axis=1)
-    return agents_log_df, goods_log_df, jobs_log_df
+    
+    govt_log_df = pd.DataFrame(m_orgs.government_log)
+    return agents_log_df, agent_status_df, goods_log_df, jobs_log_df, govt_log_df
 
 if __name__ == "__main__":
     initialize_agents()
     main()
-    a, g, j = logs_to_files()
-    a.to_excel('agents.xlsx')
-    g.to_excel('goods.xlsx')
-    j.to_excel('jobs.xlsx')
+    a, a2, g, j, gov = logs_to_files()
+    a.to_excel('./logs/agents.xlsx')
+    a2.to_excel('./logs/agents_status.xlsx')
+    g.to_excel('./logs/goods.xlsx')
+    j.to_excel('./logs/jobs.xlsx')
+    gov.to_excel('./logs/org_govt.xlsx')
+    pd.concat([a, g, j], axis=1).to_excel('./logs/all.xlsx')
 
     # data = pd.DataFrame(m_goods.goods_log)
     # data['agents'] = m_agents.agents_count_log

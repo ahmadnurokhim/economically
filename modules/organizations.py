@@ -1,6 +1,7 @@
 class Organization:
-    def __init__(self, org_id: str, employees_needed: dict):
+    def __init__(self, org_id: str, employees_needed: dict, owner_id: str= ''):
         self.org_id: str = org_id
+        self.owner_id: str = owner_id
         self.cash = 0
         self.employees_needed: dict = employees_needed
         self.employee_ids = {key: [] for key in self.employees_needed.keys()}
@@ -27,18 +28,33 @@ class Organization:
         
 class School(Organization):
     def __init__(self, org_id: str):
-        super().__init__(org_id, employees_needed={"academics":2, "student": 40})
+        super().__init__(org_id, employees_needed={"academics":2, "student": 40}, owner_id='government')
     
 class Government(Organization):
     def __init__(self, org_id: str):
-        super().__init__(org_id, employees_needed={'clerk': 100})
+        super().__init__(org_id, employees_needed={'clerk': 100}, owner_id='government')
         self.tax_income = 0
     
     def update_cash(self):
         self.cash += self.tax_income
         self.tax_income = 0
 
-orgs_all = {'school_1': School('school_1'), 'government': Government('government')}
+class Power_Plant(Organization):
+    def __init__(self, org_id: str):
+        super().__init__(org_id, employees_needed={'clerks': 4, 'workers': 10, 'specialist': 2}, owner_id='government')
+
+orgs_all = {
+    'school_1': School('school_1'),
+    'government': Government('government'),
+    'power_plant_1': Power_Plant('power_plant_1')}
+government_log = []
 
 def update_monthly():
+    global orgs_all
+    log_government()
     orgs_all['government'].update_cash()
+
+def log_government():
+    global government_log
+    global orgs_all
+    government_log.append({'cash': orgs_all['government'].cash, 'tax': orgs_all['government'].tax_income})

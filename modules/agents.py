@@ -24,12 +24,14 @@ class Agent:
         AGENT_ID = AGENT_ID + 1
     
     def update(self):
-        self.consume()
-        self.update_consumption_factor()
         self.work()
         self.pay_tax()
+        self.consume()
+        self.update_consumption_factor()
         if not isinstance(self.job, m_jobs.Student): # Dont consider change job if student
-            if np.random.random() < 0.01:
+            if self.job.title in level_1_jobs.keys() and np.random.random() < 0.005:
+                self.consider_change_job()
+            elif self.job.title not in level_1_jobs.keys() and np.random.random() < 0.1:
                 self.consider_change_job()
            
     def consume(self):
@@ -38,8 +40,8 @@ class Agent:
             actual_consumption = value * self.consumption_factor # actual consumption for current goods  
             self._update_global_demand(goods_name, actual_consumption)  # add this agent's demand to global demand
             money_spent_on_this_goods = m_goods.goods_all[goods_name].price * actual_consumption # calculate money spent on this goods
-            self._update_wealth(money_spent_on_this_goods) # subtract money spent from wealth
             money_spent += money_spent_on_this_goods
+        self._update_wealth(money_spent) # subtract money spent from wealth
         m_vars.gdp_current_month += money_spent # add this agent's spent to GDP
         self.latest_spending = money_spent # update this agent's latest spending
         
@@ -116,7 +118,7 @@ class Agent:
         if opportunity[best_opportunity] < opportunity['self'] * 1.05:
             return False # Return false if best opportunity is not more than 5% higher income than current
 
-        if 'student' in opportunity.keys() and (self.wealth > 2 * -INCOME_STUDENT * 48): # 48 months
+        if 'student' in opportunity.keys() and (self.wealth > 2 * -INCOME_STUDENT * 48) and (self.skill_level < 4.0): # 48 months
             best_opportunity = 'student' # If student is in option, and enough wealth
 
         if best_opportunity not in level_1_jobs.keys() or best_opportunity == 'student': # check if the best is not level 1 jobs (because level 1 jobs dont need to apply)
@@ -149,6 +151,7 @@ agents_count_log = []   # Store agent count over time
 agents_wealth_log = []  # Store agents' wealth over time
 agents_consumption_factor_log = []
 agents_avg_skill_log = []
+agent_latest_status = []
 
 def update_monthly():
     wealth_of_all_agents = []
@@ -186,3 +189,17 @@ def handle_population_growth():
                 job = m_jobs.Driver()
             agent = Agent(job=random.choice(m_jobs.available_jobs))
             agents_list.append(agent)
+
+def log_latest_agent_status():
+    global agent_latest_status
+    agent: Agent
+    for agent in agents_list:
+        agent_latest_status.append({
+            'id': agent.id,
+            'wealth': agent.wealth,
+            'job': agent.job.title,
+            'income': agent.job.income,
+            'spending': agent.latest_spending,
+            'cons_f': agent.consumption_factor,
+            'skill': agent.skill_level
+        })
