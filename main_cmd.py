@@ -13,8 +13,8 @@ import modules.organizations as m_orgs
 # np.random.seed(20)
 
 # Constants for simulation settings
-SIMULATION_PERIOD = 300 # Total simulation months
-NUMBER_OF_AGENTS = 3000  # Initial number of agents
+SIMULATION_PERIOD = 600 # Total simulation months
+NUMBER_OF_AGENTS = 6000  # Initial number of agents
 
 # Initialize agents at the start of the simulation
 def initialize_agents():
@@ -43,6 +43,7 @@ def initialize_agents():
 def main():
     # Iterate through the simulation period
     for _ in range(SIMULATION_PERIOD):
+        print(_)
         m_agents.update_monthly()
         m_goods.update_monthly()
         m_jobs.update_monthly()

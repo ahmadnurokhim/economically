@@ -31,7 +31,7 @@ class Agent:
         if not isinstance(self.job, m_jobs.Student): # Dont consider change job if student
             if self.job.title in level_1_jobs.keys() and np.random.random() < 0.005:
                 self.consider_change_job()
-            elif self.job.title not in level_1_jobs.keys() and np.random.random() < 0.1:
+            elif self.job.title not in level_1_jobs.keys() and np.random.random() < 0.2:
                 self.consider_change_job()
            
     def consume(self):
@@ -67,13 +67,13 @@ class Agent:
     def consider_change_job(self):
         # Dict all the income of level 1 jobs, and add self income
         opportunity = level_1_jobs.copy() # Make a copy to prevent modifying the original dictionary
-        opportunity.update({'self': self.job.income})
+        opportunity |= {'self': self.job.income}
 
         # If agent skill is 2 or more, add level 2 jobs to the dictionary
         if self.skill_level >= 2.0:
-            opportunity.update(level_2_jobs)
+            opportunity |= level_2_jobs
             if self.skill_level >= 3.0:
-                opportunity.update(level_3_jobs)
+                opportunity |= level_3_jobs
 
         return self._search_for_vacancy_and_apply(opportunity) # Try to change job recursively
 
@@ -103,8 +103,6 @@ class Agent:
 
     def _earn_income(self):
         self.wealth += self.job.income #* np.random.normal(1, 0.01)
-        if not isinstance(self.job, (m_jobs.Farmer, m_jobs.Retailer, m_jobs.Driver)):
-            m_orgs.orgs_all[self.job.org_id].pay_salary(self.job.income)
     
     def _search_for_vacancy_and_apply(self, opportunity: dict): # Return true if job changing successful
         if not opportunity:  # Terminate recursion if no opportunities are left
