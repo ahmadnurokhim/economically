@@ -152,6 +152,11 @@ agents_avg_skill_log = []
 agent_latest_status = []
 
 def update_monthly():
+    agent: Agent
+    for agent in agents_list:
+        agent.update()
+
+def log_agents():
     wealth_of_all_agents = []
     cons_factor_of_all_agents = []
     skill_of_all_agent = []
@@ -159,7 +164,6 @@ def update_monthly():
     jobs_of_all_agent = {key: 0 for key in m_jobs.job_mapping.keys()}
     agent: Agent
     for agent in agents_list:
-        agent.update()
         wealth_of_all_agents.append(agent.wealth)
         cons_factor_of_all_agents.append(agent.consumption_factor)
         jobs_of_all_agent[agent.job.title] += 1

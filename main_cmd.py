@@ -44,17 +44,25 @@ def main():
     # Iterate through the simulation period
     for _ in range(SIMULATION_PERIOD):
         print(_)
-        m_agents.update_monthly()
         m_goods.update_monthly()
         m_jobs.update_monthly()
+        m_agents.update_monthly()
         m_orgs.update_monthly()
-        m_vars.update_gdp()
-        m_goods.reset_goods_supply_demand()
+
+        m_goods.log_goods()
+        m_jobs.log_jobs()
+        m_agents.log_agents()
+        m_orgs.log_government()
+        m_vars.log_gdp()
+
+        m_goods.reset_goods_sup_dem()
+        m_orgs.reset_orgs()
         m_vars.reset_gdp()
         m_vars.world_date += 1
         # time.sleep(0.1)
 
 def logs_to_files():
+    m_agents.log_latest_agent_status()
     agents_log_df_1 = pd.DataFrame(m_agents.agents_count_log)
     agents_log_df_2 = pd.DataFrame(m_agents.agents_wealth_log)
     agents_log_df_3 = pd.DataFrame(m_agents.agents_consumption_factor_log)

@@ -47,14 +47,18 @@ goods_all = {
 goods_log = []     # Store data about goods each month
 
 def update_monthly():
-    global goods_log
     global goods_all
+    for goods in goods_all.values(): # for all goods, store the price ratio and then reset the demand & supply
+        goods.update_price() # update the price
+
+def log_goods():
+    global goods_log
     goods_price_ratio_this_month = {key: 0 for key in goods_all.keys()}
     for key, goods in goods_all.items(): # for all goods, store the price ratio and then reset the demand & supply
-        goods.update_price() # update the price
         goods_price_ratio_this_month[key] = goods.price / goods.original_price # update the price ratio
     goods_log.append(goods_price_ratio_this_month)
 
-def reset_goods_supply_demand():
+
+def reset_goods_sup_dem():
     for goods in goods_all.values():
         goods.reset_value()

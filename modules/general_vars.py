@@ -2,7 +2,7 @@ gdp_current_month = 0
 gdp_timeline = []   # Store GDP over time
 world_date = 0
 
-def update_gdp():
+def log_gdp():
     global gdp_timeline
     gdp_timeline.append(gdp_current_month)
 

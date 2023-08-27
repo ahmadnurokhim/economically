@@ -98,7 +98,6 @@ jobs_type_log = []
 
 def update_monthly():
     global level_1_jobs
-    global jobs_incomes_log
     global jobs_all_income
 
     level_1_jobs.update({
@@ -106,11 +105,13 @@ def update_monthly():
             'retailer': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
         })
+    
+    jobs_all_income = level_1_jobs | level_2_jobs | level_3_jobs
+    
+def log_jobs():
+    global jobs_incomes_log
     jobs_incomes_log.append({
             'farmer_income': m_goods.goods_all['food'].price * FARMER_OUTPUT_FOOD,
             'retailer_income': m_goods.goods_all['goods_c'].price * RETAILER_OUTPUT_GOODS,
             'driver_income': m_goods.goods_all['transport'].price * DRIVER_OUTPUT_TRANSPORT,
         })
-    
-    jobs_all_income = level_1_jobs | level_2_jobs | level_3_jobs
-    

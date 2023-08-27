@@ -35,8 +35,6 @@ class Organization:
         self.employee_ids[job].remove(employee_id)
     
     def update(self):
-        self.revenue = 0
-        self.spending = 0
         self.update_revenue()
         self.update_spending()
         self.update_cash()
@@ -76,7 +74,11 @@ class Organization:
             self.scaling_curr += capacity_change
             self.employees_needed = {k: int(qty * self.scaling_curr) for k, qty in self.employees_needed_init.items()}
             self.produced = {k: int(qty * self.scaling_curr) for k, qty in self.produced_init.items()}
-        
+    
+    def reset_rev_spe(self):
+        self.revenue = 0
+        self.spending = 0
+
 class School(Organization):
     def __init__(self, org_id: str):
         super().__init__(org_id, employees_needed={"academics":2, "student": 40}, owner_id='government')
@@ -91,9 +93,12 @@ class Government(Organization):
             self.employees_needed[key] = int(self.employees_needed_init[key]) + int(self.employees_needed_init[key] * len(m_agents.agents_list) / 2000)
     
     def update_revenue(self):
-        self.tax_income = 0
         super().update_revenue()
         self.revenue += self.tax_income
+    
+    def reset_rev_spe(self):
+        super().reset_rev_spe()
+        self.tax_income = 0
 
 class Power_Plant(Organization):
     def __init__(self, org_id: str):
@@ -113,7 +118,6 @@ government_log = []
 
 def update_monthly():
     global orgs_all
-    log_government()
     org: Organization
     for org in orgs_all.values():
         org.update()
@@ -123,7 +127,13 @@ def log_government():
     global orgs_all
     government_log.append({
         'gov_cash': orgs_all['government'].cash,
-        'gov_revenue': orgs_all['government'].cash,
-        'gov_spending': orgs_all['government'].cash,
+        'gov_revenue': orgs_all['government'].revenue + orgs_all['government'].tax_income,
+        'gov_spending': orgs_all['government'].spending,
         'gov_tax_income': orgs_all['government'].tax_income,
         'gov_clerk': len(orgs_all['government'].employee_ids['clerk'])})
+        
+def reset_orgs():
+    global orgs_all
+    org: Organization
+    for org in orgs_all.values():
+        org.reset_rev_spe()
